@@ -16,4 +16,7 @@ char *compute_get_request(const char *host, const char *url, char *query_params,
 char *compute_post_request(const char *host, const char *url, const char* content_type, char **body_data,
 							int body_data_fields_count, char** cookies, int cookies_count, string token);
 
+char *compute_delete_request(const char *host, const char *url, char *query_params,
+                            char **cookies, int cookies_count, string token);							
+
 #endif

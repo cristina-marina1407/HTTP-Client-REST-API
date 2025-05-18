@@ -96,7 +96,7 @@ void login_admin(string &cookies, string &token) {
 		if (parsed_response.contains("error")) {
 			string error_msg = parsed_response["error"].get<string>();
 			if (error_msg.find("Invalid credentials") != string::npos) {
-				cout << "ERROR: " << status_code << "Credentials are not good!" << endl;
+				cout << "ERROR: " << status_code << " Credentials are not good!" << endl;
 			} else {
 				cout << "ERROR: " << status_code << error_msg << endl;
 			}
@@ -219,6 +219,152 @@ void get_users(string &cookies, string &token) {
 		if (parsed_response.contains("error")) {
 			string error_msg = parsed_response["error"].get<string>();
 			cout << "ERROR: " << status_code << error_msg << endl;
+		}
+	}
+
+	close_connection(sockfd);
+	free(request);
+}
+
+void delete_user(string &cookies, string &token) {
+	string username;
+	cout<< "username=";
+	getline(cin, username);
+
+	const char *access_route = "/api/v1/tema/admin/users/username";
+
+	if (admin == -1) {
+		cout << "ERROR: User is not admin" << endl;
+		return;
+	}
+
+	if (username.find(' ') != string::npos) {
+    	cout << "ERROR: Incomplete/Wrong information" << endl;
+    	return;
+	}
+
+	char *send_cookies = strdup(cookies.c_str());
+
+	int sockfd = open_connection((char *)HOST, PORT, AF_INET, SOCK_STREAM, 0);
+	char *request = compute_delete_request(HOST, access_route, NULL, &send_cookies, 1, token);
+	send_to_server(sockfd, request);
+
+	char *response = receive_from_server(sockfd);
+
+	string resp_str(response);
+
+	int status_code = get_status_code(resp_str);
+
+	if (status_code == 200) {
+		cout << "SUCCESS: " << status_code << " - OK" << endl;
+
+		string cookie = get_cookie(resp_str);
+		if (!cookie.empty()) {
+			cookies = cookie;
+		}
+	} else {
+		char *json_response = basic_extract_json_response(response);
+		json parsed_response = json::parse(json_response);
+		if (parsed_response.contains("error")) {
+			string error_msg = parsed_response["error"].get<string>();
+			cout << "ERROR: " << status_code << error_msg << endl;
+		}
+	}
+
+	close_connection(sockfd);
+	free(request);
+}
+
+void logout_admin(string &cookies, string &token) {
+	const char *access_route = "/api/v1/tema/admin/logout";
+
+	if (admin == -1) {
+		cout << "ERROR: User is not admin" << endl;
+		return;
+	}
+
+	char *send_cookies = strdup(cookies.c_str());
+
+	int sockfd = open_connection((char *)HOST, PORT, AF_INET, SOCK_STREAM, 0);
+	char *request = compute_get_request(HOST, access_route, NULL, &send_cookies, 1, token);
+	send_to_server(sockfd, request);
+
+	char *response = receive_from_server(sockfd);
+
+	string resp_str(response);
+	
+	int status_code = get_status_code(resp_str);
+
+	if (status_code == 200) {
+		cout << "SUCCESS: Admin logged off" << endl;
+
+		string cookie = get_cookie(resp_str);
+		if (!cookie.empty()) {
+			cookies = cookie;
+		}
+	} else {
+		char *json_response = basic_extract_json_response(response);
+		json parsed_response = json::parse(json_response);
+		if (parsed_response.contains("error")) {
+			string error_msg = parsed_response["error"].get<string>();
+			cout << "ERROR: " << status_code << error_msg << endl;
+		}
+	}
+
+	close_connection(sockfd);
+	free(request);
+}
+
+void login(string &cookies, string &token) {
+	string admin_username, username, password;
+	cout<< "admin_username=";
+	getline(cin, admin_username);
+	cout<< "username=";
+	getline(cin, username);
+	cout << "password=";
+	getline(cin, password);
+
+	/* Creating the JSON payload */
+	json json_data;
+	json_data["admin_username"] = admin_username;
+	json_data["username"] = username;
+	json_data["password"] = password;
+	string json_payload = json_data.dump();
+
+	const char *access_route = "/api/v1/tema/user/login";
+	char *body_data[1];
+	body_data[0] = (char*)json_payload.c_str();
+
+	char *send_cookies = strdup(cookies.c_str());
+
+	int sockfd = open_connection((char *)HOST, PORT, AF_INET, SOCK_STREAM, 0);
+	char *request = compute_post_request(HOST, access_route, PAYLOAD_TYPE,
+										 body_data, 1, &send_cookies, 1, token);
+	send_to_server(sockfd, request);
+	char *response = receive_from_server(sockfd);
+
+	string resp_str(response);
+	
+	int status_code = get_status_code(resp_str);
+
+	if (status_code == 200) {
+		cout << "SUCCESS: " << "Successfully logged in" << endl;
+
+		string cookie = get_cookie(resp_str);
+		if (!cookie.empty()) {
+			cookies = cookie;
+		}
+
+	} else {
+		char *json_response = basic_extract_json_response(response);
+		json parsed_response = json::parse(json_response);
+		if (parsed_response.contains("error")) {
+			string error_msg = parsed_response["error"].get<string>();
+			if (error_msg.find("Invalid credentials") != string::npos) {
+				cout << "ERROR: " << status_code << " Credentials are not good!" << endl;
+			} else {
+				cout << "ERROR: " << status_code << error_msg << endl;
+			}
 		}
 	}
 

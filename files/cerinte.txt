@@ -1,34 +1,25 @@
-3. Get_users (10p)
-Nu necesită parametri.
-
-
-get_users
-
-Input
-get_users
-Output
-
-SUCCESS: Lista utilizatorilor
-#1 test:test
-#2 john:doe
-
-4.3 Vizualizare utilizatori normali
+4.4 Ștergerea unui utilizator
 Ruta de acces:
 
-GET /api/v1/tema/admin/users
+DELETE /api/v1/tema/admin/users/:username
+e.g: /api/v1/tema/admin/users/user123
+
 Observații:
-❗ Trebuie să demonstrați că aveți rol de admin.
+❗ Necesită rol de admin.
 
-Răspuns:
-
-{
-  "users": [
-    {
-      "id": Number,
-      "password": String,
-      "username": String
-    }
-  ]
-}
 Erori tratate:
-👎 Lipsă permisiuni admin.
+👎 Lipsă rol admin.
+👎 Username invalid.
+
+4. Delete_user (5p)
+Oferă prompt pentru username.
+
+
+delete_user
+
+username=something
+
+Input
+
+delete_user
+username=test

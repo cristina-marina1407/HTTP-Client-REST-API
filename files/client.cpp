@@ -35,11 +35,11 @@ int main()
 		} else if (command == "get_users") {
 			get_users(cookies, token);
 		} else if (command == "delete_users") {
-			break;
+			delete_user(cookies, token);
 		} else if (command == "logout_admin") {
-			break;
+			logout_admin(cookies, token);
 		} else if (command == "login") {
-			break;
+			login(cookies, token);
         } else if (command == "get_access") {
 			break;
         } else if (command == "get_movies") {

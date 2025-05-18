@@ -116,3 +116,47 @@ char *compute_post_request(const char *host, const char *url, const char* conten
 	free(line);
 	return message;
 }
+
+char *compute_delete_request(const char *host, const char *url, char *query_params,
+							char **cookies, int cookies_count, std::string token)
+{
+	char *message = (char*)calloc(BUFLEN, sizeof(char));
+	char *line = (char*)calloc(LINELEN, sizeof(char));
+
+	// Step 1: write the method name, URL, request params (if any) and protocol type
+	if (query_params != NULL) {
+		sprintf(line, "DELETE %s?%s HTTP/1.1", url, query_params);
+	} else {
+		sprintf(line, "DELETE %s HTTP/1.1", url);
+	}
+	compute_message(message, line);
+
+	// Step 2: add the host
+	sprintf(line, "Host: %s", host);
+	compute_message(message, line);
+
+	// Step 3: add token if present
+	if (!token.empty()) {
+		memset(line, 0, LINELEN);
+		sprintf(line, "Authorization: Bearer %s", token.c_str());
+		compute_message(message, line);
+	}
+
+	// Step 4: add cookies if present
+	if (cookies != NULL) {
+		sprintf(line, "Cookie: ");
+		for (int i = 0; i < cookies_count; i++) {
+			strcat(line, cookies[i]);
+			if (i < cookies_count - 1) {
+				strcat(line, "; ");
+			}
+		}
+		compute_message(message, line);
+	}
+
+	// Step 5: add final new line
+	compute_message(message, "");
+
+	free(line);
+	return message;
+}
