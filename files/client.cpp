@@ -20,6 +20,7 @@ int main()
 {
 	string command;
 	string cookies;
+	string token;
 
 	while (1) {
 		/* Read the command from stdin */
@@ -28,7 +29,7 @@ int main()
 		if (command == "exit") {
 			return 0;
 		} else if (command == "login_admin") {
-			login_admin(cookies);
+			login_admin(cookies, token);
 		} else if (command == "add_user") {
 			break;
 		} else if (command == "get_users") {

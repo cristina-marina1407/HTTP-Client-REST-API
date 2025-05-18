@@ -8,9 +8,12 @@
 #include <arpa/inet.h>
 #include "helper.hpp"
 #include "requests.hpp"
+#include <string>
+
+using namespace std;
 
 char *compute_get_request(const char *host, const char *url, char *query_params,
-							char **cookies, int cookies_count)
+							char **cookies, int cookies_count, string token)
 {
 	char *message = (char*)calloc(BUFLEN, sizeof(char));
 	char *line = (char*)calloc(LINELEN, sizeof(char));
@@ -27,6 +30,13 @@ char *compute_get_request(const char *host, const char *url, char *query_params,
 	// Step 2: add the host
 	sprintf(line, "Host: %s", host);
 	compute_message(message, line);
+
+	if (!token.empty()) {
+		memset(line, 0, LINELEN);
+		sprintf(line, "Authorization: Bearer %s", token.c_str());
+		compute_message(message, line);
+	}
+
 	// Step 3 (optional): add headers and/or cookies, according to the protocol format
 	if (cookies != NULL) {
 		sprintf(line, "Cookie: ");
@@ -45,7 +55,7 @@ char *compute_get_request(const char *host, const char *url, char *query_params,
 }
 
 char *compute_post_request(const char *host, const char *url, const char* content_type, char **body_data,
-							int body_data_fields_count, char **cookies, int cookies_count)
+							int body_data_fields_count, char **cookies, int cookies_count, string token)
 {
 	char *message = (char*)calloc(BUFLEN, sizeof(char));
 	char *line = (char*)calloc(LINELEN, sizeof(char));
@@ -64,8 +74,8 @@ char *compute_post_request(const char *host, const char *url, const char* conten
 	*/
 
 	memset(line, 0, LINELEN);
-   sprintf(line, "Content-Type: %s", content_type);
-   compute_message(message, line);
+	sprintf(line, "Content-Type: %s", content_type);
+	compute_message(message, line);
 
 	for (int i = 0; i < body_data_fields_count; i++) {
 		strcat(body_data_buffer, body_data[i]);
@@ -77,6 +87,13 @@ char *compute_post_request(const char *host, const char *url, const char* conten
 	memset(line, 0, LINELEN);
 	sprintf(line, "Content-Length: %ld", strlen(body_data_buffer));
 	compute_message(message, line);
+
+	/* Add token */
+	if (!token.empty()) {
+		memset(line, 0, LINELEN);
+		sprintf(line, "Authorization: Bearer %s", token.c_str());
+		compute_message(message, line);
+	}
 
 	// Step 4 (optional): add cookies
 	if (cookies != NULL) {

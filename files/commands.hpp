@@ -8,6 +8,6 @@ using namespace std;
 #define PORT 8081
 #define PAYLOAD_TYPE "application/json"
 
-void login_admin(string &cookies);
+void login_admin(string &cookies, string &token);
 
 #endif

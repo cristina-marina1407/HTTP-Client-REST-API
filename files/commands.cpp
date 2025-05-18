@@ -17,7 +17,7 @@
 using namespace std;
 using namespace nlohmann;
 
-void login_admin(string &cookies) {
+void login_admin(string &cookies, string &token) {
 	/* Reading the username and password */
 	string username, password;
 	cout<< "username=";
@@ -35,13 +35,15 @@ void login_admin(string &cookies) {
 	char *body_data[1];
 	body_data[0] = (char*)json_payload.c_str();
 
+	/* Check if the admin is already logged in */
 	if (!cookies.empty()) {
 		cout << "ERROR : Admin already logged in." << endl;
 		return;
 	}
 
 	int sockfd = open_connection((char *)HOST, PORT, AF_INET, SOCK_STREAM, 0);
-	char *request = compute_post_request(HOST, access_route, PAYLOAD_TYPE, body_data, 1, NULL, 0);
+	char *request = compute_post_request(HOST, access_route, PAYLOAD_TYPE,
+										 body_data, 1, NULL, 0, token);
 	send_to_server(sockfd, request);
 	char *response = receive_from_server(sockfd);
 
@@ -51,7 +53,8 @@ void login_admin(string &cookies) {
 	size_t first_space = resp_str.find(' ');
 	size_t second_space = resp_str.find(' ', first_space + 1);
 	if (first_space != string::npos && second_space != string::npos) {
-		string status_code_str = resp_str.substr(first_space + 1, second_space - first_space - 1);
+		string status_code_str = resp_str.substr(first_space + 1,
+										 		 second_space - first_space - 1);
 		status_code = stoi(status_code_str);
 	} 
 
@@ -65,26 +68,34 @@ void login_admin(string &cookies) {
 	}
 
 	if (status_code == 200) {
-    cout << "SUCCESS: " << status_code << " - OK" << endl;
+	cout << "SUCCESS: " << status_code << " - OK" << endl;
 	} else {
 		char *json_response = basic_extract_json_response(response);
 		if (json_response != NULL) {
 			json parsed_response = json::parse(json_response, nullptr, false);
-			if (!parsed_response.is_discarded() && parsed_response.contains("error")) {
+			if (!parsed_response.is_discarded() &&
+				parsed_response.contains("error")) {
 				string error_msg = parsed_response["error"].get<string>();
 				if (error_msg.find("Invalid credentials") != string::npos) {
-					cout << status_code << " - ERROR: Credentials are not good!" << endl;
+					cout << status_code
+						 << " - ERROR: Credentials are not good!" << endl;
 				} else {
 					cout << status_code << " - ERROR: " << error_msg << endl;
 				}
 			} else {
-				cout << status_code << " - ERROR: Unexpected response!" << endl;
+				cout << status_code << " - ERROR: Unexpected response!"
+					 << endl;
 			}
 		} else {
-			cout << status_code << " - ERROR: No JSON response from server!" << endl;
+			cout << status_code << " - ERROR: No JSON response from server!"
+				 << endl;
 		}
 	}
 
 	close_connection(sockfd);
 	free(request);
+}
+
+void add_user() {
+
 }

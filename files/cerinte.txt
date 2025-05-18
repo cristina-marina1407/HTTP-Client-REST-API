@@ -1,0 +1,40 @@
+4.2 Adăugarea unui utilizator normal
+Ruta de acces:
+
+POST /api/v1/tema/admin/users
+Tip payload:
+
+application/json
+Payload:
+
+{
+  "username": String,
+  "password": String
+}
+Observații:
+❗ Trebuie să demonstrați că aveți rol de admin.
+❗ Userul aparține adminului curent.
+
+Erori tratate:
+👎 Lipsă rol admin.
+👎 Informații incomplete/incorecte.
+
+add_user - adaugă un nou utilizator normal (doar admin)
+
+2. Add_user (5p)
+Oferă prompt pentru username și password.
+
+
+add_user
+
+username=something
+password=something
+
+Input
+add_user
+username=test
+password=test
+Output
+
+SUCCESS: Utilizator adăugat cu succes
+
