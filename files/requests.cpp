@@ -41,7 +41,6 @@ char *compute_get_request(const char *host, const char *url, char *query_params,
 	if (cookies != NULL) {
 		sprintf(line, "Cookie: ");
 		for (int i = 0; i < cookies_count; i++) {
-			sprintf(line, "%s", cookies[i]);
 			strcat(line, cookies[i]);
 			if (i < cookies_count - 1) {
 				strcat(line, "; ");

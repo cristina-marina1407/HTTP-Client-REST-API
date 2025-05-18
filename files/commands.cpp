@@ -64,7 +64,7 @@ void login_admin(string &cookies, string &token) {
 
 	/* Check if the admin is already logged in */
 	if (!cookies.empty()) {
-		cout << "ERROR: Admin already logged in." << endl;
+		cout << "ERROR: Admin already logged in" << endl;
 		return;
 	}
 
@@ -89,16 +89,16 @@ void login_admin(string &cookies, string &token) {
 		if (!cookie.empty()) {
 			cookies = cookie;
 		}
+
 	} else {
 		char *json_response = basic_extract_json_response(response);
 		json parsed_response = json::parse(json_response);
 		if (parsed_response.contains("error")) {
 			string error_msg = parsed_response["error"].get<string>();
 			if (error_msg.find("Invalid credentials") != string::npos) {
-				cout << status_code
-				<< " - ERROR: Credentials are not good!" << endl;
+				cout << "ERROR: " << status_code << "Credentials are not good!" << endl;
 			} else {
-				cout << status_code << " - ERROR: " << error_msg << endl;
+				cout << "ERROR: " << status_code << error_msg << endl;
 			}
 		}
 	}
@@ -143,11 +143,71 @@ void add_user(string &cookies, string &token) {
 	char *response = receive_from_server(sockfd);
 
 	string resp_str(response);
-	
+
 	int status_code = get_status_code(resp_str);
 
 	if (status_code == 201) {
 		cout << "SUCCESS: " << status_code << " - OK" << endl;
+
+		string cookie = get_cookie(resp_str);
+		if (!cookie.empty()) {
+			cookies = cookie;
+		}
+
+	} else {
+		char *json_response = basic_extract_json_response(response);
+		json parsed_response = json::parse(json_response);
+		if (parsed_response.contains("error")) {
+			char *json_response = basic_extract_json_response(response);
+			json parsed_response = json::parse(json_response);
+			if (parsed_response.contains("error")) {
+				string error_msg = parsed_response["error"].get<string>();
+				cout << "ERROR: " << status_code << error_msg << endl;
+			}
+		}
+	}
+
+	close_connection(sockfd);
+	free(request);
+}
+
+void get_users(string &cookies, string &token) {
+	const char *access_route = "/api/v1/tema/admin/users";
+
+	if (admin == -1) {
+		cout << "ERROR: User is not admin" << endl;
+		return;
+	}
+
+	char *send_cookies = strdup(cookies.c_str());
+
+	int sockfd = open_connection((char *)HOST, PORT, AF_INET, SOCK_STREAM, 0);
+	char *request = compute_get_request(HOST, access_route, NULL, &send_cookies, 1, token);
+	send_to_server(sockfd, request);
+
+	char *response = receive_from_server(sockfd);
+
+	string resp_str(response);
+	
+	int status_code = get_status_code(resp_str);
+
+	if (status_code == 200) {
+		cout << "SUCCESS: Users:" << endl;
+
+		char *json_response = basic_extract_json_response(response);
+		json parsed_response = json::parse(json_response);
+
+		if (parsed_response.find("users") != parsed_response.end()) {
+			auto users = parsed_response["users"];
+			int index = 1;
+			for (const auto& user : users) {
+				//int id = user["id"];
+				string username = user["username"];
+				string password = user["password"];
+				cout << "#" << index << " " << username << ":" << password << endl;
+				index++;
+			}
+		}
 
 		string cookie = get_cookie(resp_str);
 		if (!cookie.empty()) {
@@ -158,7 +218,7 @@ void add_user(string &cookies, string &token) {
 		json parsed_response = json::parse(json_response);
 		if (parsed_response.contains("error")) {
 			string error_msg = parsed_response["error"].get<string>();
-			cout << status_code << " - ERROR: " << error_msg << endl;
+			cout << "ERROR: " << status_code << error_msg << endl;
 		}
 	}
 

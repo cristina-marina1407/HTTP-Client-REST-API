@@ -33,7 +33,7 @@ int main()
 		} else if (command == "add_user") {
 			add_user(cookies, token);
 		} else if (command == "get_users") {
-			break;
+			get_users(cookies, token);
 		} else if (command == "delete_users") {
 			break;
 		} else if (command == "logout_admin") {

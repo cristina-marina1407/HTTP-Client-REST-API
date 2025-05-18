@@ -1,40 +1,34 @@
-4.2 Adăugarea unui utilizator normal
-Ruta de acces:
-
-POST /api/v1/tema/admin/users
-Tip payload:
-
-application/json
-Payload:
-
-{
-  "username": String,
-  "password": String
-}
-Observații:
-❗ Trebuie să demonstrați că aveți rol de admin.
-❗ Userul aparține adminului curent.
-
-Erori tratate:
-👎 Lipsă rol admin.
-👎 Informații incomplete/incorecte.
-
-add_user - adaugă un nou utilizator normal (doar admin)
-
-2. Add_user (5p)
-Oferă prompt pentru username și password.
+3. Get_users (10p)
+Nu necesită parametri.
 
 
-add_user
-
-username=something
-password=something
+get_users
 
 Input
-add_user
-username=test
-password=test
+get_users
 Output
 
-SUCCESS: Utilizator adăugat cu succes
+SUCCESS: Lista utilizatorilor
+#1 test:test
+#2 john:doe
 
+4.3 Vizualizare utilizatori normali
+Ruta de acces:
+
+GET /api/v1/tema/admin/users
+Observații:
+❗ Trebuie să demonstrați că aveți rol de admin.
+
+Răspuns:
+
+{
+  "users": [
+    {
+      "id": Number,
+      "password": String,
+      "username": String
+    }
+  ]
+}
+Erori tratate:
+👎 Lipsă permisiuni admin.
