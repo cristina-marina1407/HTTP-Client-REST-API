@@ -9,5 +9,6 @@ using namespace std;
 #define PAYLOAD_TYPE "application/json"
 
 void login_admin(string &cookies, string &token);
+void add_user(string &cookies, string &token);
 
 #endif

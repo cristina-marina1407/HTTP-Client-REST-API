@@ -46,7 +46,6 @@ string get_cookie(const string &resp_str) {
 }
 
 void login_admin(string &cookies, string &token) {
-	/* Reading the username and password */
 	string username, password;
 	cout<< "username=";
 	getline(cin, username);
@@ -65,13 +64,15 @@ void login_admin(string &cookies, string &token) {
 
 	/* Check if the admin is already logged in */
 	if (!cookies.empty()) {
-		cout << "ERROR : Admin already logged in." << endl;
+		cout << "ERROR: Admin already logged in." << endl;
 		return;
 	}
 
+	char *send_cookies = strdup(cookies.c_str());
+
 	int sockfd = open_connection((char *)HOST, PORT, AF_INET, SOCK_STREAM, 0);
 	char *request = compute_post_request(HOST, access_route, PAYLOAD_TYPE,
-										 body_data, 1, NULL, 0, token);
+										 body_data, 1, &send_cookies, 1, token);
 	send_to_server(sockfd, request);
 	char *response = receive_from_server(sockfd);
 
@@ -106,6 +107,61 @@ void login_admin(string &cookies, string &token) {
 	free(request);
 }
 
-void add_user() {
+void add_user(string &cookies, string &token) {
+	string username, password;
+	cout<< "username=";
+	getline(cin, username);
+	cout << "password=";
+	getline(cin, password);
 
+	/* Creating the JSON payload */
+	json json_data;
+	json_data["username"] = username;
+	json_data["password"] = password;
+	string json_payload = json_data.dump();
+
+	const char *access_route = "/api/v1/tema/admin/users";
+	char *body_data[1];
+	body_data[0] = (char*)json_payload.c_str();
+
+	if (admin == -1) {
+		cout << "ERROR: User is not admin" << endl;
+		return;
+	}
+
+	if (username.find(' ') != string::npos || password.find(' ') != string::npos) {
+    	cout << "ERROR: Incomplete/Wrong information" << endl;
+    	return;
+	}
+
+	char *send_cookies = strdup(cookies.c_str());
+
+	int sockfd = open_connection((char *)HOST, PORT, AF_INET, SOCK_STREAM, 0);
+	char *request = compute_post_request(HOST, access_route, PAYLOAD_TYPE,
+										 body_data, 1, &send_cookies, 1, token);
+	send_to_server(sockfd, request);
+	char *response = receive_from_server(sockfd);
+
+	string resp_str(response);
+	
+	int status_code = get_status_code(resp_str);
+
+	if (status_code == 201) {
+		cout << "SUCCESS: " << status_code << " - OK" << endl;
+
+		string cookie = get_cookie(resp_str);
+		if (!cookie.empty()) {
+			cookies = cookie;
+		}
+	} else {
+		char *json_response = basic_extract_json_response(response);
+		json parsed_response = json::parse(json_response);
+		if (parsed_response.contains("error")) {
+			string error_msg = parsed_response["error"].get<string>();
+			cout << status_code << " - ERROR: " << error_msg << endl;
+		}
+	}
+
+	close_connection(sockfd);
+	free(request);
 }
