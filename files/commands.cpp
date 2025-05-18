@@ -17,6 +17,34 @@
 using namespace std;
 using namespace nlohmann;
 
+int admin = -1;
+
+int get_status_code(const string &resp_str) {
+	int status_code = -1;
+	size_t code_start = resp_str.find(" ") + 1;
+	if (code_start != string::npos) {
+		string rest = resp_str.substr(code_start);
+		size_t code_end = rest.find(" ");
+		if (code_end != string::npos) {
+			string code_str = rest.substr(0, code_end);
+			status_code = stoi(code_str);
+		}
+	}
+	return status_code;
+}
+
+string get_cookie(const string &resp_str) {
+	size_t cookie_start = resp_str.find("Set-Cookie:");
+	if (cookie_start != string::npos) {
+		string cookie = resp_str.substr(cookie_start + strlen("Set-Cookie: "));
+		size_t cookie_end = cookie.find(";");
+		if (cookie_end != string::npos) {
+			return cookie.substr(0, cookie_end);
+		}
+	}
+	return "";
+}
+
 void login_admin(string &cookies, string &token) {
 	/* Reading the username and password */
 	string username, password;
@@ -48,47 +76,29 @@ void login_admin(string &cookies, string &token) {
 	char *response = receive_from_server(sockfd);
 
 	string resp_str(response);
-
-	int status_code = -1;
-	size_t first_space = resp_str.find(' ');
-	size_t second_space = resp_str.find(' ', first_space + 1);
-	if (first_space != string::npos && second_space != string::npos) {
-		string status_code_str = resp_str.substr(first_space + 1,
-										 		 second_space - first_space - 1);
-		status_code = stoi(status_code_str);
-	} 
-
-	size_t cookie_start = resp_str.find("Set-Cookie:");
-	if (cookie_start != string::npos) {
-		string cookie = resp_str.substr(cookie_start + strlen("Set-Cookie: "));
-		size_t cookie_end = cookie.find(";");
-		if (cookie_end != string::npos) {
-			cookies = cookie.substr(0, cookie_end);
-		}
-	}
+	
+	int status_code = get_status_code(resp_str);
 
 	if (status_code == 200) {
-	cout << "SUCCESS: " << status_code << " - OK" << endl;
+		cout << "SUCCESS: " << status_code << " - OK" << endl;
+
+		admin = 1;
+
+		string cookie = get_cookie(resp_str);
+		if (!cookie.empty()) {
+			cookies = cookie;
+		}
 	} else {
 		char *json_response = basic_extract_json_response(response);
-		if (json_response != NULL) {
-			json parsed_response = json::parse(json_response, nullptr, false);
-			if (!parsed_response.is_discarded() &&
-				parsed_response.contains("error")) {
-				string error_msg = parsed_response["error"].get<string>();
-				if (error_msg.find("Invalid credentials") != string::npos) {
-					cout << status_code
-						 << " - ERROR: Credentials are not good!" << endl;
-				} else {
-					cout << status_code << " - ERROR: " << error_msg << endl;
-				}
+		json parsed_response = json::parse(json_response);
+		if (parsed_response.contains("error")) {
+			string error_msg = parsed_response["error"].get<string>();
+			if (error_msg.find("Invalid credentials") != string::npos) {
+				cout << status_code
+				<< " - ERROR: Credentials are not good!" << endl;
 			} else {
-				cout << status_code << " - ERROR: Unexpected response!"
-					 << endl;
+				cout << status_code << " - ERROR: " << error_msg << endl;
 			}
-		} else {
-			cout << status_code << " - ERROR: No JSON response from server!"
-				 << endl;
 		}
 	}
 
