@@ -52,6 +52,11 @@ void login_admin(string &cookies, string &token) {
 	cout << "password=";
 	getline(cin, password);
 
+	if (username.find(' ') != string::npos || password.find(' ') != string::npos) {
+    	cout << "ERROR: Incomplete/Wrong information" << endl;
+    	return;
+	}
+
 	/* Creating the JSON payload */
 	json json_data;
 	json_data["username"] = username;
@@ -294,11 +299,8 @@ void logout_admin(string &cookies, string &token) {
 		cout << "SUCCESS: Admin logged off" << endl;
 		admin = -1;
 
-		// string cookie = get_cookie(resp_str);
-		// if (!cookie.empty()) {
-		// 	cookies = cookie;
-		// }
 		cookies.clear();
+		token.clear();
 	} else {
 		char *json_response = basic_extract_json_response(response);
 		json parsed_response = json::parse(json_response);
@@ -320,6 +322,13 @@ void login(string &cookies, string &token) {
 	getline(cin, username);
 	cout << "password=";
 	getline(cin, password);
+
+	if (username.find(' ') != string::npos ||
+	 	password.find(' ') != string::npos ||
+		admin_username.find(' ') != string::npos) {
+    	cout << "ERROR: Incomplete/Wrong information" << endl;
+    	return;
+	}
 
 	/* Creating the JSON payload */
 	json json_data;
@@ -438,7 +447,6 @@ void get_movies(string &cookies, string &token) {
 			auto movies = parsed_response["movies"];
 			int index = 1;
 			for (const auto& movie : movies) {
-				//int id = user["id"];
 				string title = movie["title"];
 				cout << "#" << index << " " << title << endl;
 				index++;
@@ -462,6 +470,10 @@ void get_movies(string &cookies, string &token) {
 	free(request);
 }
 
+void add_movie(string &cookies, string &token) {
+	
+}
+
 void logout(string &cookies, string &token) {
 	const char *access_route = "/api/v1/tema/user/logout";
 
@@ -480,12 +492,8 @@ void logout(string &cookies, string &token) {
 	if (status_code == 200) {
 		cout << "SUCCESS: User logged off" << endl;
 
-		// string cookie = get_cookie(resp_str);
-		// if (!cookie.empty()) {
-		// 	cookies = cookie;
-		// }
-
 		cookies.clear();
+		token.clear();
 	} else {
 		char *json_response = basic_extract_json_response(response);
 		json parsed_response = json::parse(json_response);
