@@ -34,7 +34,7 @@ int main()
 			add_user(cookies, token);
 		} else if (command == "get_users") {
 			get_users(cookies, token);
-		} else if (command == "delete_users") {
+		} else if (command == "delete_user") {
 			delete_user(cookies, token);
 		} else if (command == "logout_admin") {
 			logout_admin(cookies, token);
@@ -52,20 +52,18 @@ int main()
 			update_movie(cookies, token);
         } else if (command == "delete_movie") {
 			delete_movie(cookies, token);
-        } else if (command == "delete_all_movies") {
-			break;
         } else if (command == "add_collection") {
-			break;
+			add_collection(cookies, token);
         } else if (command == "get_collections") {
-			break;
+			get_collections(cookies, token);
         } else if (command == "get_collection") {
-			break;
+			get_collection(cookies, token);
         } else if (command == "delete_collection") {
-			break;
+			delete_collection(cookies, token);
         } else if (command == "add_movie_to_collection") {
-			break;
+			add_movie_to_collection(cookies, token);;
         } else if (command == "delete_movie_from_collection") {
-			break;
+			delete_movie_from_collection(cookies, token);
         } else if (command == "logout") {
 			logout(cookies, token);
 		} else {
