@@ -63,7 +63,7 @@ void login_admin(string &cookies, string &token) {
 	body_data[0] = (char*)json_payload.c_str();
 
 	/* Check if the admin is already logged in */
-	if (!cookies.empty()) {
+	if (admin == 1) {
 		cout << "ERROR: Admin already logged in" << endl;
 		return;
 	}
@@ -98,7 +98,7 @@ void login_admin(string &cookies, string &token) {
 			if (error_msg.find("Invalid credentials") != string::npos) {
 				cout << "ERROR: " << status_code << " Credentials are not good!" << endl;
 			} else {
-				cout << "ERROR: " << status_code << error_msg << endl;
+				cout << "ERROR: " << status_code << " " << error_msg << endl;
 			}
 		}
 	}
@@ -162,7 +162,7 @@ void add_user(string &cookies, string &token) {
 			json parsed_response = json::parse(json_response);
 			if (parsed_response.contains("error")) {
 				string error_msg = parsed_response["error"].get<string>();
-				cout << "ERROR: " << status_code << error_msg << endl;
+				cout << "ERROR: " << status_code << " " << error_msg << endl;
 			}
 		}
 	}
@@ -218,7 +218,7 @@ void get_users(string &cookies, string &token) {
 		json parsed_response = json::parse(json_response);
 		if (parsed_response.contains("error")) {
 			string error_msg = parsed_response["error"].get<string>();
-			cout << "ERROR: " << status_code << error_msg << endl;
+			cout << "ERROR: " << status_code << " " << error_msg << endl;
 		}
 	}
 
@@ -267,7 +267,7 @@ void delete_user(string &cookies, string &token) {
 		json parsed_response = json::parse(json_response);
 		if (parsed_response.contains("error")) {
 			string error_msg = parsed_response["error"].get<string>();
-			cout << "ERROR: " << status_code << error_msg << endl;
+			cout << "ERROR: " << status_code << " " << error_msg << endl;
 		}
 	}
 
@@ -277,11 +277,6 @@ void delete_user(string &cookies, string &token) {
 
 void logout_admin(string &cookies, string &token) {
 	const char *access_route = "/api/v1/tema/admin/logout";
-
-	if (admin == -1) {
-		cout << "ERROR: User is not admin" << endl;
-		return;
-	}
 
 	char *send_cookies = strdup(cookies.c_str());
 
@@ -297,17 +292,19 @@ void logout_admin(string &cookies, string &token) {
 
 	if (status_code == 200) {
 		cout << "SUCCESS: Admin logged off" << endl;
+		admin = -1;
 
-		string cookie = get_cookie(resp_str);
-		if (!cookie.empty()) {
-			cookies = cookie;
-		}
+		// string cookie = get_cookie(resp_str);
+		// if (!cookie.empty()) {
+		// 	cookies = cookie;
+		// }
+		cookies.clear();
 	} else {
 		char *json_response = basic_extract_json_response(response);
 		json parsed_response = json::parse(json_response);
 		if (parsed_response.contains("error")) {
 			string error_msg = parsed_response["error"].get<string>();
-			cout << "ERROR: " << status_code << error_msg << endl;
+			cout << "ERROR: " << status_code << " " << error_msg << endl;
 		}
 	}
 
@@ -363,8 +360,138 @@ void login(string &cookies, string &token) {
 			if (error_msg.find("Invalid credentials") != string::npos) {
 				cout << "ERROR: " << status_code << " Credentials are not good!" << endl;
 			} else {
-				cout << "ERROR: " << status_code << error_msg << endl;
+				cout << "ERROR: " << status_code << " " << error_msg << endl;
 			}
+		}
+	}
+
+	close_connection(sockfd);
+	free(request);
+}
+
+void get_access(string &cookies, string &token) {
+	const char *access_route = "/api/v1/tema/library/access";
+
+	char *send_cookies = strdup(cookies.c_str());
+
+	int sockfd = open_connection((char *)HOST, PORT, AF_INET, SOCK_STREAM, 0);
+	char *request = compute_get_request(HOST, access_route, NULL, &send_cookies, 1, token);
+	send_to_server(sockfd, request);
+
+	char *response = receive_from_server(sockfd);
+
+	string resp_str(response);
+	
+	int status_code = get_status_code(resp_str);
+
+	if (status_code == 200) {
+		cout << "SUCCESS: Token JWT received" << endl;
+
+		char *json_response = basic_extract_json_response(response);
+        json parsed_response = json::parse(json_response);
+        if (parsed_response.contains("token")) {
+            token = parsed_response["token"].get<string>();
+        }
+
+		string cookie = get_cookie(resp_str);
+		if (!cookie.empty()) {
+			cookies = cookie;
+		}
+	} else {
+		char *json_response = basic_extract_json_response(response);
+		json parsed_response = json::parse(json_response);
+		if (parsed_response.contains("error")) {
+			string error_msg = parsed_response["error"].get<string>();
+			cout << "ERROR: " << status_code  << " " << error_msg << endl;
+		}
+	}
+
+	close_connection(sockfd);
+	free(request);
+}
+
+void get_movies(string &cookies, string &token) {
+	const char *access_route = "/api/v1/tema/library/movies";
+
+	char *send_cookies = strdup(cookies.c_str());
+
+	int sockfd = open_connection((char *)HOST, PORT, AF_INET, SOCK_STREAM, 0);
+	char *request = compute_get_request(HOST, access_route, NULL, &send_cookies, 1, token);
+	send_to_server(sockfd, request);
+
+	char *response = receive_from_server(sockfd);
+
+	string resp_str(response);
+
+	cout << response << endl;
+	cout << request << endl;
+	
+	int status_code = get_status_code(resp_str);
+
+	if (status_code == 200) {
+		cout << "SUCCESS: Movies:" << endl;
+
+		char *json_response = basic_extract_json_response(response);
+		json parsed_response = json::parse(json_response);
+
+		if (parsed_response.find("movies") != parsed_response.end()) {
+			auto movies = parsed_response["movies"];
+			int index = 1;
+			for (const auto& movie : movies) {
+				//int id = user["id"];
+				string title = movie["title"];
+				cout << "#" << index << " " << title << endl;
+				index++;
+			}
+		}
+
+		string cookie = get_cookie(resp_str);
+		if (!cookie.empty()) {
+			cookies = cookie;
+		}
+	} else {
+		char *json_response = basic_extract_json_response(response);
+		json parsed_response = json::parse(json_response);
+		if (parsed_response.contains("error")) {
+			string error_msg = parsed_response["error"].get<string>();
+			cout << "ERROR: " << status_code << " " << error_msg << endl;
+		}
+	}
+
+	close_connection(sockfd);
+	free(request);
+}
+
+void logout(string &cookies, string &token) {
+	const char *access_route = "/api/v1/tema/user/logout";
+
+	char *send_cookies = strdup(cookies.c_str());
+
+	int sockfd = open_connection((char *)HOST, PORT, AF_INET, SOCK_STREAM, 0);
+	char *request = compute_get_request(HOST, access_route, NULL, &send_cookies, 1, token);
+	send_to_server(sockfd, request);
+
+	char *response = receive_from_server(sockfd);
+
+	string resp_str(response);
+	
+	int status_code = get_status_code(resp_str);
+
+	if (status_code == 200) {
+		cout << "SUCCESS: User logged off" << endl;
+
+		// string cookie = get_cookie(resp_str);
+		// if (!cookie.empty()) {
+		// 	cookies = cookie;
+		// }
+
+		cookies.clear();
+	} else {
+		char *json_response = basic_extract_json_response(response);
+		json parsed_response = json::parse(json_response);
+		if (parsed_response.contains("error")) {
+			string error_msg = parsed_response["error"].get<string>();
+			cout << "ERROR: " << status_code << " " << error_msg << endl;
 		}
 	}
 

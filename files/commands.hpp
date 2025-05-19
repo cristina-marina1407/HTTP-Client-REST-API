@@ -14,5 +14,8 @@ void get_users(string &cookies, string &token);
 void delete_user(string &cookies, string &token);
 void logout_admin(string &cookies, string &token);
 void login(string &cookies, string &token);
+void get_access(string &cookies, string &token);
+void get_movies(string &cookies, string &token);
+void logout(string &cookies, string &token);
 
 #endif

@@ -41,9 +41,9 @@ int main()
 		} else if (command == "login") {
 			login(cookies, token);
         } else if (command == "get_access") {
-			break;
+			get_access(cookies, token);
         } else if (command == "get_movies") {
-			break;
+			get_movies(cookies, token);
         } else if (command == "get_movie") {
 			break;
         } else if (command == "add_movie") {
@@ -67,7 +67,7 @@ int main()
         } else if (command == "delete_movie_from_collection") {
 			break;
         } else if (command == "logout") {
-			break;
+			logout(cookies, token);
 		} else {
 			cout << "Unknown command!" << endl;
 		}
