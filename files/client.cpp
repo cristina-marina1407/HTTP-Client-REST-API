@@ -45,11 +45,11 @@ int main()
         } else if (command == "get_movies") {
 			get_movies(cookies, token);
         } else if (command == "get_movie") {
-			break;
+			get_movie(cookies, token);
         } else if (command == "add_movie") {
-			break;
+			add_movie(cookies, token);
         } else if (command == "update_movie") {
-			break;
+			update_movie(cookies, token);
         } else if (command == "delete_movie") {
 			break;
         } else if (command == "delete_all_movies") {

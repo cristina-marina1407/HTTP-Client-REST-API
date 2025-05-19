@@ -160,3 +160,66 @@ char *compute_delete_request(const char *host, const char *url, char *query_para
 	free(line);
 	return message;
 }
+
+char *compute_put_request(const char *host, const char *url, const char* content_type, char **body_data,
+                         int body_data_fields_count, char **cookies, int cookies_count, std::string token)
+{
+    char *message = (char*)calloc(BUFLEN, sizeof(char));
+    char *line = (char*)calloc(LINELEN, sizeof(char));
+    char *body_data_buffer = (char*)calloc(LINELEN, sizeof(char));
+
+    // Step 1: write the method name, URL and protocol type
+    sprintf(line, "PUT %s HTTP/1.1", url);
+    compute_message(message, line);
+
+    // Step 2: add the host
+    memset(line, 0, LINELEN);
+    sprintf(line, "Host: %s", host);
+    compute_message(message, line);
+
+    // Step 3: add necessary headers (Content-Type and Content-Length are mandatory)
+    memset(line, 0, LINELEN);
+    sprintf(line, "Content-Type: %s", content_type);
+    compute_message(message, line);
+
+    for (int i = 0; i < body_data_fields_count; i++) {
+        strcat(body_data_buffer, body_data[i]);
+        if (i < body_data_fields_count - 1) {
+            strcat(body_data_buffer, "&");
+        }
+    }
+
+    memset(line, 0, LINELEN);
+    sprintf(line, "Content-Length: %ld", strlen(body_data_buffer));
+    compute_message(message, line);
+
+    // Add token
+    if (!token.empty()) {
+        memset(line, 0, LINELEN);
+        sprintf(line, "Authorization: Bearer %s", token.c_str());
+        compute_message(message, line);
+    }
+
+    // Step 4: add cookies if present
+    if (cookies != NULL) {
+        sprintf(line, "Cookie: ");
+        for (int i = 0; i < cookies_count; i++) {
+            strcat(line, cookies[i]);
+            if (i < cookies_count - 1) {
+                strcat(line, "; ");
+            }
+        }
+        compute_message(message, line);
+    }
+
+    // Step 5: add new line at end of header
+    compute_message(message, "");
+
+    // Step 6: add the actual payload data
+    memset(line, 0, LINELEN);
+    strcat(message, body_data_buffer);
+
+    free(line);
+    free(body_data_buffer);
+    return message;
+}

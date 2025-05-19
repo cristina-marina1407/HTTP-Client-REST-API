@@ -16,6 +16,9 @@ void logout_admin(string &cookies, string &token);
 void login(string &cookies, string &token);
 void get_access(string &cookies, string &token);
 void get_movies(string &cookies, string &token);
+void get_movie(string &cookies, string &token);
+void add_movie(string &cookies, string &token);
+void update_movie(string &cookies, string &token);
 void logout(string &cookies, string &token);
 
 #endif

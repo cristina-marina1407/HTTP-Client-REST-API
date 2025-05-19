@@ -236,7 +236,8 @@ void delete_user(string &cookies, string &token) {
 	cout<< "username=";
 	getline(cin, username);
 
-	const char *access_route = "/api/v1/tema/admin/users/username";
+	char access_route[256];
+    snprintf(access_route, sizeof(access_route), "/api/v1/tema/admin/users/%s", username.c_str());
 
 	if (admin == -1) {
 		cout << "ERROR: User is not admin" << endl;
@@ -431,9 +432,6 @@ void get_movies(string &cookies, string &token) {
 	char *response = receive_from_server(sockfd);
 
 	string resp_str(response);
-
-	cout << response << endl;
-	cout << request << endl;
 	
 	int status_code = get_status_code(resp_str);
 
@@ -445,11 +443,10 @@ void get_movies(string &cookies, string &token) {
 
 		if (parsed_response.find("movies") != parsed_response.end()) {
 			auto movies = parsed_response["movies"];
-			int index = 1;
 			for (const auto& movie : movies) {
+				int id = movie["id"]; 
 				string title = movie["title"];
-				cout << "#" << index << " " << title << endl;
-				index++;
+				cout << "#" << id << " " << title << endl;
 			}
 		}
 
@@ -470,8 +467,206 @@ void get_movies(string &cookies, string &token) {
 	free(request);
 }
 
-void add_movie(string &cookies, string &token) {
+void get_movie(string &cookies, string &token) {
+	string id;
+	cout<< "id=";
+	getline(cin, id);
+
+	char access_route[256];
+    snprintf(access_route, sizeof(access_route), "/api/v1/tema/library/movies/%s", id.c_str());
+
+	char *send_cookies = strdup(cookies.c_str());
+
+	int sockfd = open_connection((char *)HOST, PORT, AF_INET, SOCK_STREAM, 0);
+	char *request = compute_get_request(HOST, access_route, NULL, &send_cookies, 1, token);
+	send_to_server(sockfd, request);
+
+	char *response = receive_from_server(sockfd);
+
+	string resp_str(response);
 	
+	int status_code = get_status_code(resp_str);
+
+	if (token.empty()) {
+		cout << "ERROR: " << status_code << " " << "JWT token required" << endl;
+		return;
+	}
+
+	if (status_code == 200) {
+		cout << "SUCCESS: Movie details" << endl;
+
+		char *json_response = basic_extract_json_response(response);
+		json parsed_response = json::parse(json_response);
+
+		if (parsed_response.contains("id") && parsed_response["id"].get<int>() == stoi(id)) {
+			if (parsed_response.contains("title"))
+				cout << "title: " << parsed_response["title"].get<string>() << endl;
+			if (parsed_response.contains("year"))
+				cout << "year: " << parsed_response["year"] << endl;
+			if (parsed_response.contains("description"))
+				cout << "description: " << parsed_response["description"].get<string>() << endl;
+			if (parsed_response.contains("rating"))
+				cout << "rating: " << parsed_response["rating"].get<string>()  << endl;
+    	}
+
+		string cookie = get_cookie(resp_str);
+		if (!cookie.empty()) {
+			cookies = cookie;
+		}
+	} else {
+		char *json_response = basic_extract_json_response(response);
+		json parsed_response = json::parse(json_response);
+		if (parsed_response.contains("error")) {
+			string error_msg = parsed_response["error"].get<string>();
+			cout << "ERROR: " << status_code << " " << error_msg << endl;
+		}
+	}
+
+	close_connection(sockfd);
+	free(request);
+}
+
+void add_movie(string &cookies, string &token) {
+	string title, description, year_string, rating_string;
+	cout<< "title=";
+	getline(cin, title);
+	cout<< "year=";
+	getline(cin, year_string);
+	cout << "description=";
+	getline(cin, description);
+	cout << "rating=";
+	getline(cin, rating_string);
+
+	if (year_string.find(' ') != string::npos ||
+	 	rating_string.find(' ') != string::npos) {
+    	cout << "ERROR: Incomplete/Wrong information" << endl;
+    	return;
+	}
+
+	int year = stoi(year_string);
+    double rating = stod(rating_string);
+
+	/* Creating the JSON payload */
+	json json_data;
+	json_data["title"] = title;
+	json_data["year"] = year;
+	json_data["description"] = description;
+	json_data["rating"] = rating;
+	string json_payload = json_data.dump();
+
+	const char *access_route = "/api/v1/tema/library/movies";
+	char *body_data[1];
+	body_data[0] = (char*)json_payload.c_str();
+
+	char *send_cookies = strdup(cookies.c_str());
+
+	int sockfd = open_connection((char *)HOST, PORT, AF_INET, SOCK_STREAM, 0);
+	char *request = compute_post_request(HOST, access_route, PAYLOAD_TYPE,
+										 body_data, 1, &send_cookies, 1, token);
+	send_to_server(sockfd, request);
+	char *response = receive_from_server(sockfd);
+
+	string resp_str(response);
+	
+	int status_code = get_status_code(resp_str);
+
+	if (token.empty()) {
+		cout << "ERROR: " << status_code << " " << "JWT token required" << endl;
+		return;
+	}
+
+	if (status_code == 201) {
+		cout << "SUCCESS: Movie added" << endl;
+
+		string cookie = get_cookie(resp_str);
+		if (!cookie.empty()) {
+			cookies = cookie;
+		}
+	} else {
+		char *json_response = basic_extract_json_response(response);
+		json parsed_response = json::parse(json_response);
+		if (parsed_response.contains("error")) {
+			string error_msg = parsed_response["error"].get<string>();
+			cout << "ERROR: " << status_code  << " " << error_msg << endl;
+		}
+	}
+
+	close_connection(sockfd);
+	free(request);
+}
+
+void update_movie(string &cookies, string &token) {
+	string title, description, year_string, rating_string, id;
+	cout<< "id=";
+	getline(cin, id);
+	cout<< "title=";
+	getline(cin, title);
+	cout<< "year=";
+	getline(cin, year_string);
+	cout << "description=";
+	getline(cin, description);
+	cout << "rating=";
+	getline(cin, rating_string);
+
+	char access_route[256];
+    snprintf(access_route, sizeof(access_route), "/api/v1/tema/library/movies/%s", id.c_str());
+
+	if (year_string.find(' ') != string::npos ||
+	 	rating_string.find(' ') != string::npos) {
+    	cout << "ERROR: Incomplete/Wrong information" << endl;
+    	return;
+	}
+
+	int year = stoi(year_string);
+    double rating = stod(rating_string);
+
+	/* Creating the JSON payload */
+	json json_data;
+	//json_data["id"] = id;
+	json_data["title"] = title;
+	json_data["year"] = year;
+	json_data["description"] = description;
+	json_data["rating"] = rating;
+	string json_payload = json_data.dump();
+
+	char *body_data[1];
+	body_data[0] = (char*)json_payload.c_str();
+
+	char *send_cookies = strdup(cookies.c_str());
+
+	int sockfd = open_connection((char *)HOST, PORT, AF_INET, SOCK_STREAM, 0);
+	char *request = compute_put_request(HOST, access_route, PAYLOAD_TYPE,
+										 body_data, 1, &send_cookies, 1, token);
+	send_to_server(sockfd, request);
+	char *response = receive_from_server(sockfd);
+
+	string resp_str(response);
+	
+	int status_code = get_status_code(resp_str);
+
+	if (token.empty()) {
+		cout << "ERROR: " << status_code << " " << "JWT token required" << endl;
+		return;
+	}
+
+	if (status_code == 200) {
+		cout << "SUCCESS: Movie updated" << endl;
+
+		string cookie = get_cookie(resp_str);
+		if (!cookie.empty()) {
+			cookies = cookie;
+		}
+	} else {
+		char *json_response = basic_extract_json_response(response);
+		json parsed_response = json::parse(json_response);
+		if (parsed_response.contains("error")) {
+			string error_msg = parsed_response["error"].get<string>();
+			cout << "ERROR: " << status_code  << " " << error_msg << endl;
+		}
+	}
+
+	close_connection(sockfd);
+	free(request);
 }
 
 void logout(string &cookies, string &token) {
