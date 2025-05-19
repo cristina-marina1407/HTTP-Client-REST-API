@@ -669,6 +669,51 @@ void update_movie(string &cookies, string &token) {
 	free(request);
 }
 
+void delete_movie(string &cookies, string &token) {
+	string id;
+	cout<< "id=";
+	getline(cin, id);
+
+	char access_route[256];
+    snprintf(access_route, sizeof(access_route), "/api/v1/tema/library/movies/%s", id.c_str());
+
+	char *send_cookies = strdup(cookies.c_str());
+
+	int sockfd = open_connection((char *)HOST, PORT, AF_INET, SOCK_STREAM, 0);
+	char *request = compute_delete_request(HOST, access_route, NULL, &send_cookies, 1, token);
+	send_to_server(sockfd, request);
+
+	char *response = receive_from_server(sockfd);
+
+	string resp_str(response);
+	
+	int status_code = get_status_code(resp_str);
+
+	if (token.empty()) {
+		cout << "ERROR: " << status_code << " " << "JWT token required" << endl;
+		return;
+	}
+
+	if (status_code == 200) {
+		cout << "SUCCESS: Movie deleted" << endl;
+
+		string cookie = get_cookie(resp_str);
+		if (!cookie.empty()) {
+			cookies = cookie;
+		}
+	} else {
+		char *json_response = basic_extract_json_response(response);
+		json parsed_response = json::parse(json_response);
+		if (parsed_response.contains("error")) {
+			string error_msg = parsed_response["error"].get<string>();
+			cout << "ERROR: " << status_code << " " << error_msg << endl;
+		}
+	}
+
+	close_connection(sockfd);
+	free(request);
+}
+
 void logout(string &cookies, string &token) {
 	const char *access_route = "/api/v1/tema/user/logout";
 

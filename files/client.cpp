@@ -51,7 +51,7 @@ int main()
         } else if (command == "update_movie") {
 			update_movie(cookies, token);
         } else if (command == "delete_movie") {
-			break;
+			delete_movie(cookies, token);
         } else if (command == "delete_all_movies") {
 			break;
         } else if (command == "add_collection") {
