@@ -1,6 +1,6 @@
 ## Tema 3 PCOM - Web client. REST API Communication
 
-    First of all, this project starts with the implementation from lab9. The
+First of all, this project starts with the implementation from lab9. The
 following files are taken from there: buffer.c, buffer.h, helper.cpp, helper.hpp,
 requests.cpp, requests.hpp. I did some changes in the helper files and the
 requests files. In the helper files, I added: `is_natural_number`, function that
@@ -10,13 +10,13 @@ returns the value of the cookie header from the response string. In the response
 files, I added: `compute_delete_request`, function that computes and returns a
 DELETE request string and `compute_put_request`, function that computes and
 returns a PUT request, used only in the `update_movie` function.
-    Furthermore, I used the `nlohmann` json library to parse the JSON response,
+Furthermore, I used the `nlohmann` json library to parse the JSON response,
 I included the `json.hpp` file and the `json_fwd.hpp` file in the project for
 this particular reason. I chose to use this library first of all because it was
 recommended in the homework description and second of all because it is simple
 to use and has a lot of functions designed to help you parse the JSON, which
 is a big part of the project functionalities.
-    The project is a web client that communicates with a REST API. The
+The project is a web client that communicates with a REST API. The
 implementation is based on commands read from stdin, that are executed
 by the client, every command is a request to the server. The commands are:
 
