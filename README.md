@@ -1,4 +1,4 @@
-## Tema 3 PCOM - Web client. REST API Communication
+## Web client. REST API Communication
 
 First of all, this project starts with the implementation from lab9. The
 following files are taken from there: buffer.c, buffer.h, helper.cpp, helper.hpp,
