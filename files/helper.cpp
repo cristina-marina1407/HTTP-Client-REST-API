@@ -1,18 +1,74 @@
-#include <cstdlib>     // exit, atoi, malloc, free
+#include <cstdlib>
 #include <cstdio>
-#include <cstring>     // memcpy, memset
-#include <unistd.h>     /* read, write, close */
-#include <sys/socket.h> /* socket, connect */
-#include <netinet/in.h> /* struct sockaddr_in, struct sockaddr */
-#include <netdb.h>      /* struct hostent, gethostbyname */
+#include <cstring>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netdb.h>
 #include <arpa/inet.h>
+#include <string>
 #include "helper.hpp"
 #include "buffer.hpp"
+
+using namespace std;
 
 #define HEADER_TERMINATOR "\r\n\r\n"
 #define HEADER_TERMINATOR_SIZE (sizeof(HEADER_TERMINATOR) - 1)
 #define CONTENT_LENGTH "Content-Length: "
 #define CONTENT_LENGTH_SIZE (sizeof(CONTENT_LENGTH) - 1)
+
+/* checks if the given string is a natural number */
+bool is_natural_number(const string& id) {
+	if (id.empty())
+		return false;
+	for (char c : id) {
+		if (!isdigit(c))
+			 return false;
+	}
+	return true;
+}
+
+/* returns the HTTP status code from the response string */
+int get_status_code(const string &resp_str) {
+	int status_code = -1;
+
+	/* find the first space after HTTP/1.1 */
+	size_t code_start = resp_str.find(" ") + 1;
+	if (code_start != string::npos) {
+		/* get the substring starting from the status code */
+		string rest = resp_str.substr(code_start);
+
+		/* find the next space */
+		size_t code_end = rest.find(" ");
+
+		if (code_end != string::npos) {
+			/* extract the status code as a string and convert it to int */
+			string code_str = rest.substr(0, code_end);
+			status_code = stoi(code_str);
+		}
+	}
+	return status_code;
+}
+
+/* returns the value of the cookie header from the response string */
+string get_cookie(const string &resp_str) {
+	/* search for the "Set-Cookie:" header in the response */
+	size_t cookie_start = resp_str.find("Set-Cookie:");
+
+	/* if the header is found, extract the substring after "Set-Cookie: " */
+	if (cookie_start != string::npos) {
+		string cookie = resp_str.substr(cookie_start + strlen("Set-Cookie: "));
+
+		/* find the end for the cookie */
+		size_t cookie_end = cookie.find(";");
+
+		/* return the cookie header */
+		if (cookie_end != string::npos) {
+			return cookie.substr(0, cookie_end);
+		}
+	}
+	return "";
+}
 
 void error(const char *msg)
 {

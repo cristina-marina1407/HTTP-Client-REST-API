@@ -1,11 +1,11 @@
 #include <iostream>
 #include <string>
-#include <stdio.h>      /* printf, sprintf */
-#include <stdlib.h>     /* exit, atoi, malloc, free */
-#include <unistd.h>     /* read, write, close */
-#include <sys/socket.h> /* socket, connect */
-#include <netinet/in.h> /* struct sockaddr_in, struct sockaddr */
-#include <netdb.h>      /* struct hostent, gethostbyname */
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netdb.h>
 #include <arpa/inet.h>
 
 #include "helper.hpp"
@@ -40,31 +40,31 @@ int main()
 			logout_admin(cookies, token);
 		} else if (command == "login") {
 			login(cookies, token);
-        } else if (command == "get_access") {
+		} else if (command == "get_access") {
 			get_access(cookies, token);
-        } else if (command == "get_movies") {
+		} else if (command == "get_movies") {
 			get_movies(cookies, token);
-        } else if (command == "get_movie") {
+		} else if (command == "get_movie") {
 			get_movie(cookies, token);
-        } else if (command == "add_movie") {
+		} else if (command == "add_movie") {
 			add_movie(cookies, token);
-        } else if (command == "update_movie") {
+		} else if (command == "update_movie") {
 			update_movie(cookies, token);
-        } else if (command == "delete_movie") {
+		} else if (command == "delete_movie") {
 			delete_movie(cookies, token);
-        } else if (command == "add_collection") {
+		} else if (command == "add_collection") {
 			add_collection(cookies, token);
-        } else if (command == "get_collections") {
+		} else if (command == "get_collections") {
 			get_collections(cookies, token);
-        } else if (command == "get_collection") {
+		} else if (command == "get_collection") {
 			get_collection(cookies, token);
-        } else if (command == "delete_collection") {
+		} else if (command == "delete_collection") {
 			delete_collection(cookies, token);
-        } else if (command == "add_movie_to_collection") {
+		} else if (command == "add_movie_to_collection") {
 			add_movie_to_collection(cookies, token);;
-        } else if (command == "delete_movie_from_collection") {
+		} else if (command == "delete_movie_from_collection") {
 			delete_movie_from_collection(cookies, token);
-        } else if (command == "logout") {
+		} else if (command == "logout") {
 			logout(cookies, token);
 		} else {
 			cout << "Unknown command!" << endl;

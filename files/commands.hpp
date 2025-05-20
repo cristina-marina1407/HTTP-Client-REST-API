@@ -23,8 +23,7 @@ void update_movie(string &cookies, string &token);
 void get_collections(string &cookies, string &token);
 void get_collection(string &cookies, string &token);
 void add_collection_helper(string &cookies, string &token,
-                                    string id_collection_string,
-                                    string movie_id_string);
+						   string id_collection_string, string movie_id_string);
 void add_collection(string &cookies, string &token);
 void delete_collection(string &cookies, string &token);
 void add_movie_to_collection(string &cookies, string &token);

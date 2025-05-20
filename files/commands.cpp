@@ -1,11 +1,11 @@
 #include <iostream>
 #include <string>
-#include <stdio.h>      /* printf, sprintf */
-#include <stdlib.h>     /* exit, atoi, malloc, free */
-#include <unistd.h>     /* read, write, close */
-#include <sys/socket.h> /* socket, connect */
-#include <netinet/in.h> /* struct sockaddr_in, struct sockaddr */
-#include <netdb.h>      /* struct hostent, gethostbyname */
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netdb.h>
 #include <arpa/inet.h>
 
 #include "helper.hpp"
@@ -20,32 +20,7 @@ using namespace nlohmann;
 int admin = -1;
 int movies_added_to_collection = 0;
 
-int get_status_code(const string &resp_str) {
-	int status_code = -1;
-	size_t code_start = resp_str.find(" ") + 1;
-	if (code_start != string::npos) {
-		string rest = resp_str.substr(code_start);
-		size_t code_end = rest.find(" ");
-		if (code_end != string::npos) {
-			string code_str = rest.substr(0, code_end);
-			status_code = stoi(code_str);
-		}
-	}
-	return status_code;
-}
-
-string get_cookie(const string &resp_str) {
-	size_t cookie_start = resp_str.find("Set-Cookie:");
-	if (cookie_start != string::npos) {
-		string cookie = resp_str.substr(cookie_start + strlen("Set-Cookie: "));
-		size_t cookie_end = cookie.find(";");
-		if (cookie_end != string::npos) {
-			return cookie.substr(0, cookie_end);
-		}
-	}
-	return "";
-}
-
+/* function that logs in as admin by sending a POST request */
 void login_admin(string &cookies, string &token) {
 	string username, password;
 	cout<< "username=";
@@ -53,12 +28,14 @@ void login_admin(string &cookies, string &token) {
 	cout << "password=";
 	getline(cin, password);
 
-	if (username.find(' ') != string::npos || password.find(' ') != string::npos) {
+	/* checking input for spaces */
+	if (username.find(' ') != string::npos ||
+		password.find(' ') != string::npos) {
 		cout << "ERROR: Incomplete/Wrong information" << endl;
 		return;
 	}
 
-	/* Creating the JSON payload */
+	/* creating the JSON payload */
 	json json_data;
 	json_data["username"] = username;
 	json_data["password"] = password;
@@ -68,41 +45,47 @@ void login_admin(string &cookies, string &token) {
 	char *body_data[1];
 	body_data[0] = (char*)json_payload.c_str();
 
-	/* Check if the admin is already logged in */
+	/* check if the admin is already logged in */
 	if (admin == 1) {
 		cout << "ERROR: Admin already logged in" << endl;
 		return;
 	}
 
+	/* copy cookies to send with the request */
 	char *send_cookies = strdup(cookies.c_str());
 
+	/* send the POST request */
 	int sockfd = open_connection((char *)HOST, PORT, AF_INET, SOCK_STREAM, 0);
 	char *request = compute_post_request(HOST, access_route, PAYLOAD_TYPE,
 										 body_data, 1, &send_cookies, 1, token);
 	send_to_server(sockfd, request);
 	char *response = receive_from_server(sockfd);
 
-	string resp_str(response);
+	/* convert to string */
+	string response_string(response);
 	
-	int status_code = get_status_code(resp_str);
+	int status_code = get_status_code(response_string);
 
 	if (status_code == 200) {
-		cout << "SUCCESS: " << status_code << " - OK" << endl;
-
+		/* if the status code is successful, the admin is set to logged in */
 		admin = 1;
 
-		string cookie = get_cookie(resp_str);
+		/* save the session cookie */
+		string cookie = get_cookie(response_string);
 		if (!cookie.empty()) {
 			cookies = cookie;
 		}
 
+		cout << "SUCCESS: " << status_code << " - OK" << endl;
 	} else {
+		/* extract the error message */
 		char *json_response = basic_extract_json_response(response);
 		json parsed_response = json::parse(json_response);
 		if (parsed_response.contains("error")) {
 			string error_msg = parsed_response["error"].get<string>();
 			if (error_msg.find("Invalid credentials") != string::npos) {
-				cout << "ERROR: " << status_code << " Credentials are not good!" << endl;
+				cout << "ERROR: " << status_code
+					 << " Username/password is wrong " << endl;
 			} else {
 				cout << "ERROR: " << status_code << " " << error_msg << endl;
 			}
@@ -111,8 +94,11 @@ void login_admin(string &cookies, string &token) {
 
 	close_connection(sockfd);
 	free(request);
+	free(response);
+	free(send_cookies);
 }
 
+/* function that adds a new user by sending a POST request */
 void add_user(string &cookies, string &token) {
 	string username, password;
 	cout<< "username=";
@@ -120,7 +106,19 @@ void add_user(string &cookies, string &token) {
 	cout << "password=";
 	getline(cin, password);
 
-	/* Creating the JSON payload */
+	/* checking input for spaces */
+	if (username.find(' ') != string::npos || password.find(' ') != string::npos) {
+		cout << "ERROR: Incomplete/Wrong information" << endl;
+		return;
+	}
+
+	/* check if the admin user is admin */
+	if (admin == -1) {
+		cout << "ERROR: User is not admin" << endl;
+		return;
+	}
+
+	/* creating the JSON payload */
 	json json_data;
 	json_data["username"] = username;
 	json_data["password"] = password;
@@ -130,37 +128,31 @@ void add_user(string &cookies, string &token) {
 	char *body_data[1];
 	body_data[0] = (char*)json_payload.c_str();
 
-	if (admin == -1) {
-		cout << "ERROR: User is not admin" << endl;
-		return;
-	}
-
-	if (username.find(' ') != string::npos || password.find(' ') != string::npos) {
-		cout << "ERROR: Incomplete/Wrong information" << endl;
-		return;
-	}
-
+	/* copy cookies to send with the request */
 	char *send_cookies = strdup(cookies.c_str());
 
+	/* send the POST request */
 	int sockfd = open_connection((char *)HOST, PORT, AF_INET, SOCK_STREAM, 0);
 	char *request = compute_post_request(HOST, access_route, PAYLOAD_TYPE,
 										 body_data, 1, &send_cookies, 1, token);
 	send_to_server(sockfd, request);
 	char *response = receive_from_server(sockfd);
 
-	string resp_str(response);
+	/* convert to string */
+	string response_string(response);
 
-	int status_code = get_status_code(resp_str);
+	int status_code = get_status_code(response_string);
 
 	if (status_code == 201) {
-		cout << "SUCCESS: " << status_code << " - OK" << endl;
-
-		string cookie = get_cookie(resp_str);
+		/* save the session cookie */
+		string cookie = get_cookie(response_string);
 		if (!cookie.empty()) {
 			cookies = cookie;
 		}
 
+		cout << "SUCCESS: " << status_code << " - OK" << endl;
 	} else {
+		/* extract the error message */
 		char *json_response = basic_extract_json_response(response);
 		json parsed_response = json::parse(json_response);
 		if (parsed_response.contains("error")) {
@@ -175,27 +167,35 @@ void add_user(string &cookies, string &token) {
 
 	close_connection(sockfd);
 	free(request);
+	free(response);
+	free(send_cookies);
 }
 
+/* function that gets the list of users by sending a GET request */
 void get_users(string &cookies, string &token) {
 	const char *access_route = "/api/v1/tema/admin/users";
 
+	/* check if the admin user is admin */
 	if (admin == -1) {
 		cout << "ERROR: User is not admin" << endl;
 		return;
 	}
 
+	/* copy cookies to send with the request */
 	char *send_cookies = strdup(cookies.c_str());
 
+	/* send the GET request */
 	int sockfd = open_connection((char *)HOST, PORT, AF_INET, SOCK_STREAM, 0);
-	char *request = compute_get_request(HOST, access_route, NULL, &send_cookies, 1, token);
+	char *request = compute_get_request(HOST, access_route, NULL,
+										&send_cookies, 1, token);
 	send_to_server(sockfd, request);
 
 	char *response = receive_from_server(sockfd);
 
-	string resp_str(response);
+	/* convert to string */
+	string response_string(response);
 	
-	int status_code = get_status_code(resp_str);
+	int status_code = get_status_code(response_string);
 
 	if (status_code == 200) {
 		cout << "SUCCESS: Users:" << endl;
@@ -203,11 +203,11 @@ void get_users(string &cookies, string &token) {
 		char *json_response = basic_extract_json_response(response);
 		json parsed_response = json::parse(json_response);
 
+		/* extracts the users from the response and prints them */
 		if (parsed_response.find("users") != parsed_response.end()) {
 			auto users = parsed_response["users"];
 			int index = 1;
 			for (const auto& user : users) {
-				//int id = user["id"];
 				string username = user["username"];
 				string password = user["password"];
 				cout << "#" << index << " " << username << ":" << password << endl;
@@ -215,11 +215,13 @@ void get_users(string &cookies, string &token) {
 			}
 		}
 
-		string cookie = get_cookie(resp_str);
+		/* save the session cookie */
+		string cookie = get_cookie(response_string);
 		if (!cookie.empty()) {
 			cookies = cookie;
 		}
 	} else {
+		/* extract the error message */
 		char *json_response = basic_extract_json_response(response);
 		json parsed_response = json::parse(json_response);
 		if (parsed_response.contains("error")) {
@@ -230,46 +232,57 @@ void get_users(string &cookies, string &token) {
 
 	close_connection(sockfd);
 	free(request);
+	free(response);
+	free(send_cookies);
 }
 
+/* function that delets an user by sending a DELETE request */
 void delete_user(string &cookies, string &token) {
 	string username;
 	cout<< "username=";
 	getline(cin, username);
 
-	char access_route[256];
-	snprintf(access_route, sizeof(access_route), "/api/v1/tema/admin/users/%s", username.c_str());
-
-	if (admin == -1) {
-		cout << "ERROR: User is not admin" << endl;
-		return;
-	}
-
+	/* checking input for spaces */
 	if (username.find(' ') != string::npos) {
 		cout << "ERROR: Incomplete/Wrong information" << endl;
 		return;
 	}
 
+	/* check if the admin user is admin */
+	if (admin == -1) {
+		cout << "ERROR: User is not admin" << endl;
+		return;
+	}
+
+	/* concatenate the path with the username for the request */
+	char access_route[256];
+	snprintf(access_route, sizeof(access_route), "/api/v1/tema/admin/users/%s",
+			 username.c_str());
+
+	/* copy cookies to send with the request */		 
 	char *send_cookies = strdup(cookies.c_str());
 
+	/* send the delete request */
 	int sockfd = open_connection((char *)HOST, PORT, AF_INET, SOCK_STREAM, 0);
 	char *request = compute_delete_request(HOST, access_route, NULL, &send_cookies, 1, token);
 	send_to_server(sockfd, request);
 
 	char *response = receive_from_server(sockfd);
 
-	string resp_str(response);
+	string response_string(response);
 
-	int status_code = get_status_code(resp_str);
+	int status_code = get_status_code(response_string);
 
 	if (status_code == 200) {
-		cout << "SUCCESS: " << status_code << " - OK" << endl;
-
-		string cookie = get_cookie(resp_str);
+		/* save the session cookie */
+		string cookie = get_cookie(response_string);
 		if (!cookie.empty()) {
 			cookies = cookie;
 		}
+
+		cout << "SUCCESS: " << status_code << " - OK" << endl;
 	} else {
+		/* extract the error message */
 		char *json_response = basic_extract_json_response(response);
 		json parsed_response = json::parse(json_response);
 		if (parsed_response.contains("error")) {
@@ -280,30 +293,47 @@ void delete_user(string &cookies, string &token) {
 
 	close_connection(sockfd);
 	free(request);
+	free(response);
+	free(send_cookies);
 }
 
+/* function that logs out the admin by sending a GET request */
 void logout_admin(string &cookies, string &token) {
 	const char *access_route = "/api/v1/tema/admin/logout";
 
+	/* check if the admin is logged in */
+	if (admin == -1) {
+		cout << "ERROR: User is not admin" << endl;
+		return;
+	}
+
+	/* copy cookies to send with the request */
 	char *send_cookies = strdup(cookies.c_str());
 
+	/* send the GET request */
 	int sockfd = open_connection((char *)HOST, PORT, AF_INET, SOCK_STREAM, 0);
 	char *request = compute_get_request(HOST, access_route, NULL, &send_cookies, 1, token);
 	send_to_server(sockfd, request);
 
 	char *response = receive_from_server(sockfd);
 
-	string resp_str(response);
+	string response_string(response);
 	
-	int status_code = get_status_code(resp_str);
+	int status_code = get_status_code(response_string);
 
 	if (status_code == 200) {
-		cout << "SUCCESS: Admin logged off" << endl;
+		/* change the admin to logged off */
 		admin = -1;
 
+		/* clear the cookies */
 		cookies.clear();
+
+		/* clear the token */
 		token.clear();
+
+		cout << "SUCCESS: Admin logged off" << endl;
 	} else {
+		/* extract the error message */
 		char *json_response = basic_extract_json_response(response);
 		json parsed_response = json::parse(json_response);
 		if (parsed_response.contains("error")) {
@@ -314,10 +344,14 @@ void logout_admin(string &cookies, string &token) {
 
 	close_connection(sockfd);
 	free(request);
+	free(response);
+	free(send_cookies);
 }
 
+/* function that logs in a user by sending a POST request */
 void login(string &cookies, string &token) {
 	string admin_username, username, password;
+	/* the admin username is necessary to log in a user as well */
 	cout<< "admin_username=";
 	getline(cin, admin_username);
 	cout<< "username=";
@@ -325,6 +359,7 @@ void login(string &cookies, string &token) {
 	cout << "password=";
 	getline(cin, password);
 
+	/* checking input for spaces */
 	if (username.find(' ') != string::npos ||
 	 	password.find(' ') != string::npos ||
 		admin_username.find(' ') != string::npos) {
@@ -332,7 +367,7 @@ void login(string &cookies, string &token) {
 		return;
 	}
 
-	/* Creating the JSON payload */
+	/* creating the JSON payload */
 	json json_data;
 	json_data["admin_username"] = admin_username;
 	json_data["username"] = username;
@@ -343,33 +378,37 @@ void login(string &cookies, string &token) {
 	char *body_data[1];
 	body_data[0] = (char*)json_payload.c_str();
 
+	/* copy cookies to send with the request */
 	char *send_cookies = strdup(cookies.c_str());
 
+	/* send the POST request */
 	int sockfd = open_connection((char *)HOST, PORT, AF_INET, SOCK_STREAM, 0);
 	char *request = compute_post_request(HOST, access_route, PAYLOAD_TYPE,
 										 body_data, 1, &send_cookies, 1, token);
 	send_to_server(sockfd, request);
 	char *response = receive_from_server(sockfd);
 
-	string resp_str(response);
+	/* convert to string */
+	string response_string(response);
 	
-	int status_code = get_status_code(resp_str);
+	int status_code = get_status_code(response_string);
 
 	if (status_code == 200) {
-		cout << "SUCCESS: " << "Successfully logged in" << endl;
-
-		string cookie = get_cookie(resp_str);
+		/* save the session cookie */
+		string cookie = get_cookie(response_string);
 		if (!cookie.empty()) {
 			cookies = cookie;
 		}
 
+		cout << "SUCCESS: " << "Successfully logged in" << endl;
 	} else {
 		char *json_response = basic_extract_json_response(response);
 		json parsed_response = json::parse(json_response);
 		if (parsed_response.contains("error")) {
 			string error_msg = parsed_response["error"].get<string>();
 			if (error_msg.find("Invalid credentials") != string::npos) {
-				cout << "ERROR: " << status_code << " Credentials are not good!" << endl;
+				cout << "ERROR: " << status_code
+				 	 << " Username/password is wrong " << endl;
 			} else {
 				cout << "ERROR: " << status_code << " " << error_msg << endl;
 			}
@@ -378,37 +417,47 @@ void login(string &cookies, string &token) {
 
 	close_connection(sockfd);
 	free(request);
+	free(response);
+	free(send_cookies);
 }
 
+/* function that gets the access token by sending a GET request */
 void get_access(string &cookies, string &token) {
 	const char *access_route = "/api/v1/tema/library/access";
 
+	/* copy cookies to send with the request */
 	char *send_cookies = strdup(cookies.c_str());
 
+	/* send the GET request */
 	int sockfd = open_connection((char *)HOST, PORT, AF_INET, SOCK_STREAM, 0);
-	char *request = compute_get_request(HOST, access_route, NULL, &send_cookies, 1, token);
+	char *request = compute_get_request(HOST, access_route, NULL,
+										&send_cookies, 1, token);
 	send_to_server(sockfd, request);
 
 	char *response = receive_from_server(sockfd);
 
-	string resp_str(response);
+	/* convert to string */
+	string response_string(response);
 	
-	int status_code = get_status_code(resp_str);
+	int status_code = get_status_code(response_string);
 
 	if (status_code == 200) {
-		cout << "SUCCESS: Token JWT received" << endl;
-
+		/* extract the token from the response */
 		char *json_response = basic_extract_json_response(response);
 		json parsed_response = json::parse(json_response);
 		if (parsed_response.contains("token")) {
 			token = parsed_response["token"].get<string>();
 		}
 
-		string cookie = get_cookie(resp_str);
+		/* save the session cookie */
+		string cookie = get_cookie(response_string);
 		if (!cookie.empty()) {
 			cookies = cookie;
 		}
+
+		cout << "SUCCESS: Token JWT received" << endl;
 	} else {
+		/* extract the error message */
 		char *json_response = basic_extract_json_response(response);
 		json parsed_response = json::parse(json_response);
 		if (parsed_response.contains("error")) {
@@ -419,24 +468,35 @@ void get_access(string &cookies, string &token) {
 
 	close_connection(sockfd);
 	free(request);
+	free(response);
+	free(send_cookies);
 }
 
+/* function that gets the list of movies by sending a GET request */
 void get_movies(string &cookies, string &token) {
 	const char *access_route = "/api/v1/tema/library/movies";
 
+	/* copy cookies to send with the request */
 	char *send_cookies = strdup(cookies.c_str());
 
+	/* send the GET request */
 	int sockfd = open_connection((char *)HOST, PORT, AF_INET, SOCK_STREAM, 0);
-	char *request = compute_get_request(HOST, access_route, NULL, &send_cookies, 1, token);
+	char *request = compute_get_request(HOST, access_route, NULL,
+										&send_cookies, 1, token);
 	send_to_server(sockfd, request);
 
 	char *response = receive_from_server(sockfd);
 
-	cout << response << endl;
-
-	string resp_str(response);
+	/* convert to string */
+	string response_string(response);
 	
-	int status_code = get_status_code(resp_str);
+	int status_code = get_status_code(response_string);
+
+	/* check if the user has access to the library */
+	if (token.empty()) {
+		cout << "ERROR: " << status_code << " " << "JWT token required" << endl;
+		return;
+	}
 
 	if (status_code == 200) {
 		cout << "SUCCESS: Movies:" << endl;
@@ -444,6 +504,7 @@ void get_movies(string &cookies, string &token) {
 		char *json_response = basic_extract_json_response(response);
 		json parsed_response = json::parse(json_response);
 
+		/* extracts the movies from the response and prints them */
 		if (parsed_response.find("movies") != parsed_response.end()) {
 			auto movies = parsed_response["movies"];
 			for (const auto& movie : movies) {
@@ -453,11 +514,13 @@ void get_movies(string &cookies, string &token) {
 			}
 		}
 
-		string cookie = get_cookie(resp_str);
+		/* save the session cookie */
+		string cookie = get_cookie(response_string);
 		if (!cookie.empty()) {
 			cookies = cookie;
 		}
 	} else {
+		/* extract the error message */
 		char *json_response = basic_extract_json_response(response);
 		json parsed_response = json::parse(json_response);
 		if (parsed_response.contains("error")) {
@@ -468,28 +531,50 @@ void get_movies(string &cookies, string &token) {
 
 	close_connection(sockfd);
 	free(request);
+	free(response);
+	free(send_cookies);
 }
 
+/* function that gets the details of a movie by sending a GET request */
 void get_movie(string &cookies, string &token) {
 	string id;
 	cout<< "id=";
 	getline(cin, id);
 
-	char access_route[256];
-	snprintf(access_route, sizeof(access_route), "/api/v1/tema/library/movies/%s", id.c_str());
+	/* checking input for spaces */
+	if (id.find(' ') != string::npos) {
+		cout << "ERROR: Incomplete/Wrong information" << endl;
+		return;
+	}
 
+	/* check if the id is a natural number */
+	if (!is_natural_number(id)) {
+		cout << "ERROR: Invalid id" << endl;
+		return;
+	}
+
+	/* concatenate the path with the movie id for the request */
+	char access_route[256];
+	snprintf(access_route, sizeof(access_route), "/api/v1/tema/library/movies/%s",
+			id.c_str());
+
+	/* copy cookies to send with the request */
 	char *send_cookies = strdup(cookies.c_str());
 
+	/* send the GET request */
 	int sockfd = open_connection((char *)HOST, PORT, AF_INET, SOCK_STREAM, 0);
-	char *request = compute_get_request(HOST, access_route, NULL, &send_cookies, 1, token);
+	char *request = compute_get_request(HOST, access_route, NULL,
+										&send_cookies, 1, token);
 	send_to_server(sockfd, request);
 
 	char *response = receive_from_server(sockfd);
 
-	string resp_str(response);
+	/* convert to string */
+	string response_string(response);
 	
-	int status_code = get_status_code(resp_str);
+	int status_code = get_status_code(response_string);
 
+	/* check if the user has access to the library */
 	if (token.empty()) {
 		cout << "ERROR: " << status_code << " " << "JWT token required" << endl;
 		return;
@@ -501,22 +586,23 @@ void get_movie(string &cookies, string &token) {
 		char *json_response = basic_extract_json_response(response);
 		json parsed_response = json::parse(json_response);
 
-		if (parsed_response.contains("id") && parsed_response["id"].get<int>() == stoi(id)) {
-			if (parsed_response.contains("title"))
-				cout << "title: " << parsed_response["title"].get<string>() << endl;
-			if (parsed_response.contains("year"))
-				cout << "year: " << parsed_response["year"] << endl;
-			if (parsed_response.contains("description"))
-				cout << "description: " << parsed_response["description"].get<string>() << endl;
-			if (parsed_response.contains("rating"))
-				cout << "rating: " << parsed_response["rating"].get<string>()  << endl;
-		}
+		/* extract the movie details from the response and prints them*/
+		if (parsed_response.contains("title"))
+			cout << "title: " << parsed_response["title"].get<string>() << endl;
+		if (parsed_response.contains("year"))
+			cout << "year: " << parsed_response["year"] << endl;
+		if (parsed_response.contains("description"))
+			cout << "description: " << parsed_response["description"].get<string>() << endl;
+		if (parsed_response.contains("rating"))
+			cout << "rating: " << parsed_response["rating"].get<string>()  << endl;
 
-		string cookie = get_cookie(resp_str);
+		/* save the session cookie */
+		string cookie = get_cookie(response_string);
 		if (!cookie.empty()) {
 			cookies = cookie;
 		}
 	} else {
+		/* extract the error message */
 		char *json_response = basic_extract_json_response(response);
 		json parsed_response = json::parse(json_response);
 		if (parsed_response.contains("error")) {
@@ -527,8 +613,11 @@ void get_movie(string &cookies, string &token) {
 
 	close_connection(sockfd);
 	free(request);
+	free(response);
+	free(send_cookies);
 }
 
+/* function that adds a new movie by sending a POST request */
 void add_movie(string &cookies, string &token) {
 	string title, description, year_string, rating_string;
 	cout<< "title=";
@@ -540,6 +629,7 @@ void add_movie(string &cookies, string &token) {
 	cout << "rating=";
 	getline(cin, rating_string);
 
+	/* checking input for spaces */
 	if (year_string.find(' ') != string::npos ||
 	 	rating_string.find(' ') != string::npos) {
 		cout << "ERROR: Incomplete/Wrong information" << endl;
@@ -549,7 +639,7 @@ void add_movie(string &cookies, string &token) {
 	int year = stoi(year_string);
 	double rating = stod(rating_string);
 
-	/* Creating the JSON payload */
+	/* creating the JSON payload */
 	json json_data;
 	json_data["title"] = title;
 	json_data["year"] = year;
@@ -561,31 +651,37 @@ void add_movie(string &cookies, string &token) {
 	char *body_data[1];
 	body_data[0] = (char*)json_payload.c_str();
 
+	/* copy cookies to send with the request */
 	char *send_cookies = strdup(cookies.c_str());
 
+	/* send the POST request */
 	int sockfd = open_connection((char *)HOST, PORT, AF_INET, SOCK_STREAM, 0);
 	char *request = compute_post_request(HOST, access_route, PAYLOAD_TYPE,
 										 body_data, 1, &send_cookies, 1, token);
 	send_to_server(sockfd, request);
 	char *response = receive_from_server(sockfd);
 
-	string resp_str(response);
+	/* convert to string */
+	string response_string(response);
 	
-	int status_code = get_status_code(resp_str);
+	int status_code = get_status_code(response_string);
 
+	/* check if the user has access to the library */
 	if (token.empty()) {
 		cout << "ERROR: " << status_code << " " << "JWT token required" << endl;
 		return;
 	}
 
 	if (status_code == 201) {
-		cout << "SUCCESS: Movie added" << endl;
-
-		string cookie = get_cookie(resp_str);
+		/* save the session cookie */
+		string cookie = get_cookie(response_string);
 		if (!cookie.empty()) {
 			cookies = cookie;
 		}
+
+		cout << "SUCCESS: Movie added" << endl;
 	} else {
+		/* extract the error message */
 		char *json_response = basic_extract_json_response(response);
 		json parsed_response = json::parse(json_response);
 		if (parsed_response.contains("error")) {
@@ -596,8 +692,11 @@ void add_movie(string &cookies, string &token) {
 
 	close_connection(sockfd);
 	free(request);
+	free(response);
+	free(send_cookies);
 }
 
+/* function that updates a movie by sending a PUT request */
 void update_movie(string &cookies, string &token) {
 	string title, description, year_string, rating_string, id;
 	cout<< "id=";
@@ -611,21 +710,28 @@ void update_movie(string &cookies, string &token) {
 	cout << "rating=";
 	getline(cin, rating_string);
 
-	char access_route[256];
-	snprintf(access_route, sizeof(access_route), "/api/v1/tema/library/movies/%s", id.c_str());
-
+	/* checking input for spaces */
 	if (year_string.find(' ') != string::npos ||
 	 	rating_string.find(' ') != string::npos) {
 		cout << "ERROR: Incomplete/Wrong information" << endl;
 		return;
 	}
 
+	/* check if the id is a natural number */
+	if (!is_natural_number(id)) {
+		cout << "ERROR: Invalid id" << endl;
+		return;
+	}
+
+	/* concatenate the path with the id for the request */
+	char access_route[256];
+	snprintf(access_route, sizeof(access_route), "/api/v1/tema/library/movies/%s", id.c_str());
+
 	int year = stoi(year_string);
 	double rating = stod(rating_string);
 
-	/* Creating the JSON payload */
+	/* creating the JSON payload */
 	json json_data;
-	//json_data["id"] = id;
 	json_data["title"] = title;
 	json_data["year"] = year;
 	json_data["description"] = description;
@@ -635,31 +741,37 @@ void update_movie(string &cookies, string &token) {
 	char *body_data[1];
 	body_data[0] = (char*)json_payload.c_str();
 
+	/* copy cookies to send with the request */
 	char *send_cookies = strdup(cookies.c_str());
 
+	/* send the PUT request */
 	int sockfd = open_connection((char *)HOST, PORT, AF_INET, SOCK_STREAM, 0);
 	char *request = compute_put_request(HOST, access_route, PAYLOAD_TYPE,
 										 body_data, 1, &send_cookies, 1, token);
 	send_to_server(sockfd, request);
 	char *response = receive_from_server(sockfd);
 
-	string resp_str(response);
+	/* convert to string */
+	string response_string(response);
 	
-	int status_code = get_status_code(resp_str);
+	int status_code = get_status_code(response_string);
 
+	/* check if the user has access to the library */
 	if (token.empty()) {
 		cout << "ERROR: " << status_code << " " << "JWT token required" << endl;
 		return;
 	}
 
 	if (status_code == 200) {
-		cout << "SUCCESS: Movie updated" << endl;
-
-		string cookie = get_cookie(resp_str);
+		/* save the session cookie */
+		string cookie = get_cookie(response_string);
 		if (!cookie.empty()) {
 			cookies = cookie;
 		}
+
+		cout << "SUCCESS: Movie updated" << endl;
 	} else {
+		/* extract the error message */
 		char *json_response = basic_extract_json_response(response);
 		json parsed_response = json::parse(json_response);
 		if (parsed_response.contains("error")) {
@@ -670,41 +782,63 @@ void update_movie(string &cookies, string &token) {
 
 	close_connection(sockfd);
 	free(request);
+	free(response);
+	free(send_cookies);
 }
 
+/* function that deletes a movie by sending a DELETE request */
 void delete_movie(string &cookies, string &token) {
 	string id;
 	cout<< "id=";
 	getline(cin, id);
 
+	/* checking input for spaces */
+	if (id.find(' ') != string::npos) {
+		cout << "ERROR: Incomplete/Wrong information" << endl;
+		return;
+	}
+
+	/* check if the id is a natural number */
+	if (!is_natural_number(id)) {
+		cout << "ERROR: Invalid id" << endl;
+		return;
+	}
+
+	/* concatenate the path with the id for the request */
 	char access_route[256];
 	snprintf(access_route, sizeof(access_route), "/api/v1/tema/library/movies/%s", id.c_str());
 
+	/* copy cookies to send with the request */
 	char *send_cookies = strdup(cookies.c_str());
 
+	/* send the DELETE request */
 	int sockfd = open_connection((char *)HOST, PORT, AF_INET, SOCK_STREAM, 0);
 	char *request = compute_delete_request(HOST, access_route, NULL, &send_cookies, 1, token);
 	send_to_server(sockfd, request);
 
 	char *response = receive_from_server(sockfd);
 
-	string resp_str(response);
+	/* convert to string */
+	string response_string(response);
 	
-	int status_code = get_status_code(resp_str);
+	int status_code = get_status_code(response_string);
 
+	/* check if the user has access to the library */
 	if (token.empty()) {
 		cout << "ERROR: " << status_code << " " << "JWT token required" << endl;
 		return;
 	}
 
 	if (status_code == 200) {
-		cout << "SUCCESS: Movie deleted" << endl;
-
-		string cookie = get_cookie(resp_str);
+		/* save the session cookie */
+		string cookie = get_cookie(response_string);
 		if (!cookie.empty()) {
 			cookies = cookie;
 		}
+
+		cout << "SUCCESS: Movie deleted" << endl;
 	} else {
+		/* extract the error message */
 		char *json_response = basic_extract_json_response(response);
 		json parsed_response = json::parse(json_response);
 		if (parsed_response.contains("error")) {
@@ -715,23 +849,30 @@ void delete_movie(string &cookies, string &token) {
 
 	close_connection(sockfd);
 	free(request);
+	free(response);
+	free(send_cookies);
 }
 
+/* function that gets the list of collections by sending a GET request */
 void get_collections(string &cookies, string &token) {
 	const char *access_route = "/api/v1/tema/library/collections";
 
+	/* copy cookies to send with the request */
 	char *send_cookies = strdup(cookies.c_str());
 
+	/* send the GET request */
 	int sockfd = open_connection((char *)HOST, PORT, AF_INET, SOCK_STREAM, 0);
 	char *request = compute_get_request(HOST, access_route, NULL, &send_cookies, 1, token);
 	send_to_server(sockfd, request);
 
 	char *response = receive_from_server(sockfd);
 
-	string resp_str(response);
+	/* convert to string */
+	string response_string(response);
 	
-	int status_code = get_status_code(resp_str);
+	int status_code = get_status_code(response_string);
 
+	/* check if the user has access to the library */
 	if (token.empty()) {
 		cout << "ERROR: " << status_code << " " << "JWT token required" << endl;
 		return;
@@ -743,6 +884,7 @@ void get_collections(string &cookies, string &token) {
 		char *json_response = basic_extract_json_response(response);
 		json parsed_response = json::parse(json_response);
 
+		/* extracts the collections from the response and prints them */
 		if (parsed_response.find("collections") != parsed_response.end()) {
 			auto collections = parsed_response["collections"];
 			for (const auto& collection : collections) {
@@ -752,11 +894,13 @@ void get_collections(string &cookies, string &token) {
 			}
 		}
 
-		string cookie = get_cookie(resp_str);
+		/* save the session cookie */
+		string cookie = get_cookie(response_string);
 		if (!cookie.empty()) {
 			cookies = cookie;
 		}
 	} else {
+		/* extract the error message */
 		char *json_response = basic_extract_json_response(response);
 		json parsed_response = json::parse(json_response);
 		if (parsed_response.contains("error")) {
@@ -767,28 +911,48 @@ void get_collections(string &cookies, string &token) {
 
 	close_connection(sockfd);
 	free(request);
+	free(response);
+	free(send_cookies);
 }
 
+/* function that gets the details of a collection by sending a GET request */
 void get_collection(string &cookies, string &token) {
 	string id;
 	cout<< "id=";
 	getline(cin, id);
 
+	/* checking input for spaces */
+	if (id.find(' ') != string::npos) {
+		cout << "ERROR: Incomplete/Wrong information" << endl;
+		return;
+	}
+
+	/* check if the id is a natural number */
+	if (!is_natural_number(id)) {
+		cout << "ERROR: Invalid id" << endl;
+		return;
+	}
+
+	/* concatenate the path with the id for the request */
 	char access_route[256];
 	snprintf(access_route, sizeof(access_route), "/api/v1/tema/library/collections/%s", id.c_str());
 
+	/* copy cookies to send with the request */
 	char *send_cookies = strdup(cookies.c_str());
 
+	/* send the GET request */
 	int sockfd = open_connection((char *)HOST, PORT, AF_INET, SOCK_STREAM, 0);
 	char *request = compute_get_request(HOST, access_route, NULL, &send_cookies, 1, token);
 	send_to_server(sockfd, request);
 
 	char *response = receive_from_server(sockfd);
 
-	string resp_str(response);
+	/* convert to string */
+	string response_string(response);
 	
-	int status_code = get_status_code(resp_str);
+	int status_code = get_status_code(response_string);
 
+	/* check if the user has access to the library */
 	if (token.empty()) {
 		cout << "ERROR: " << status_code << " " << "JWT token required" << endl;
 		return;
@@ -800,26 +964,29 @@ void get_collection(string &cookies, string &token) {
 		char *json_response = basic_extract_json_response(response);
 		json parsed_response = json::parse(json_response);
 
-		if (parsed_response.contains("id") && parsed_response["id"].get<int>() == stoi(id)) {
-			if (parsed_response.contains("title"))
-				cout << "title: " << parsed_response["title"].get<string>() << endl;
-			if (parsed_response.contains("owner"))
-				cout << "owner: " << parsed_response["owner"].get<string>() << endl;
-			if (parsed_response.find("movies") != parsed_response.end()) {
-				auto movies = parsed_response["movies"];
-				for (const auto& movie : movies) {
-					int id = movie["id"]; 
-					string title = movie["title"];
-					cout << "#" << id << " " << title << endl;
-				}
+		/* extract the collection details from the response and prints them */
+		if (parsed_response.contains("title"))
+			cout << "title: " << parsed_response["title"].get<string>() << endl;
+		if (parsed_response.contains("owner"))
+			cout << "owner: " << parsed_response["owner"].get<string>() << endl;
+
+		/* print every movie in the collection */
+		if (parsed_response.find("movies") != parsed_response.end()) {
+			auto movies = parsed_response["movies"];
+			for (const auto& movie : movies) {
+				int id = movie["id"]; 
+				string title = movie["title"];
+				cout << "#" << id << " " << title << endl;
 			}
 		}
-
-		string cookie = get_cookie(resp_str);
+		
+		/* save the session cookie */
+		string cookie = get_cookie(response_string);
 		if (!cookie.empty()) {
 			cookies = cookie;
 		}
 	} else {
+		/* extract the error message */
 		char *json_response = basic_extract_json_response(response);
 		json parsed_response = json::parse(json_response);
 		if (parsed_response.contains("error")) {
@@ -830,14 +997,20 @@ void get_collection(string &cookies, string &token) {
 
 	close_connection(sockfd);
 	free(request);
+	free(response);
+	free(send_cookies);
 }
 
-void add_collection_helper(string &cookies, string &token, string id_collection_string, string movie_id_string) {
+/* function used to add the valid movies in the collection */
+void add_collection_helper(string &cookies, string &token,
+						   string id_collection_string, string movie_id_string) {
+	/* concatenate the path with the movie id for the request */
 	char access_route[256];
 	snprintf(access_route, sizeof(access_route), "/api/v1/tema/library/collections/%s/movies", id_collection_string.c_str());
 
 	int id = stoi(movie_id_string);
 
+	/* creating the JSON payload */
 	json json_data;
 	json_data["id"] = id;
 	string json_payload = json_data.dump();
@@ -845,31 +1018,40 @@ void add_collection_helper(string &cookies, string &token, string id_collection_
 	char *body_data[1];
 	body_data[0] = (char*)json_payload.c_str();
 
+	/* copy cookies to send with the request */
 	char *send_cookies = strdup(cookies.c_str());
 
+	/* send the POST request */
 	int sockfd = open_connection((char *)HOST, PORT, AF_INET, SOCK_STREAM, 0);
 	char *request = compute_post_request(HOST, access_route, PAYLOAD_TYPE,
 										 body_data, 1, &send_cookies, 1, token);
 	send_to_server(sockfd, request);
 	char *response = receive_from_server(sockfd);
 
-	string resp_str(response);
+	/* convert to string */
+	string response_string(response);
 	
-	int status_code = get_status_code(resp_str);
+	int status_code = get_status_code(response_string);
 
 	if (status_code == 201) {
-		string cookie = get_cookie(resp_str);
+		/* save the session cookie */
+		string cookie = get_cookie(response_string);
 		if (!cookie.empty()) {
 			cookies = cookie;
 		}
 
+		/* increase the number of movies added in the collection */
 		movies_added_to_collection++;
 	}
 
 	close_connection(sockfd);
 	free(request);
+	free(response);
+	free(send_cookies);
 }
 
+
+/* function that adds a new collection and every movie in it by sending a POST request */
 void add_collection(string &cookies, string &token) {
 	string title, num_movies_string;
 	cout<< "title=";
@@ -881,6 +1063,7 @@ void add_collection(string &cookies, string &token) {
 
 	vector<string> movie_id_string(num_movies);
 
+	/* add all of the movie ids in a vector */
 	for (int i = 0; i < num_movies; i++) {
 		cout << "movie_id[" << i << "]=";
 		getline(cin, movie_id_string[i]);
@@ -889,10 +1072,12 @@ void add_collection(string &cookies, string &token) {
 		}
 	}
 
+	/* reset the movies added to every collection counter */
 	movies_added_to_collection = 0;
 
 	const char *access_route = "/api/v1/tema/library/collections";
 
+	/* creating the JSON payload */
 	json json_data;
 	json_data["title"] = title;
 	string json_payload = json_data.dump();
@@ -900,18 +1085,22 @@ void add_collection(string &cookies, string &token) {
 	char *body_data[1];
 	body_data[0] = (char*)json_payload.c_str();
 
+	/* copy cookies to send with the request */
 	char *send_cookies = strdup(cookies.c_str());
 
+	/* send the POST request */
 	int sockfd = open_connection((char *)HOST, PORT, AF_INET, SOCK_STREAM, 0);
 	char *request = compute_post_request(HOST, access_route, PAYLOAD_TYPE,
 										 body_data, 1, &send_cookies, 1, token);
 	send_to_server(sockfd, request);
 	char *response = receive_from_server(sockfd);
 
-	string resp_str(response);
+	/* convert to string */
+	string response_string(response);
 	
-	int status_code = get_status_code(resp_str);
+	int status_code = get_status_code(response_string);
 
+	/* check if the user has access to the library */
 	if (token.empty()) {
 		cout << "ERROR: " << status_code << " " << "JWT token required" << endl;
 		return;
@@ -920,28 +1109,36 @@ void add_collection(string &cookies, string &token) {
 	if (status_code == 201) {
 		char *json_response = basic_extract_json_response(response);
 		json parsed_response = json::parse(json_response);
+
+		/* extract the collection id from the response */
 		int id;
 		if (parsed_response.contains("id")) {
 			id = parsed_response["id"];
 		}
 
+		/* transform the id to string to use it in the helper */
 		string id_string = to_string(id);
 
+		/* add every movie in the collection */
 		for (int i = 0; i < num_movies; i++) {
 			add_collection_helper(cookies, token, id_string, movie_id_string[i]);
 		}
 
-		string cookie = get_cookie(resp_str);
+		/* save the session cookie */
+		string cookie = get_cookie(response_string);
 		if (!cookie.empty()) {
 			cookies = cookie;
 		}
 
-		if (movies_added_to_collection == 0) {
-			cout << "ERROR: " << status_code  << " " << "Empty collection" << endl;
+		/* check if the collection is complete*/
+		if (movies_added_to_collection != num_movies) {
+			cout << "ERROR: " << status_code  << " "
+				 << "Not all of the movies were valid" << endl;
 		}
 
 		cout << "SUCCESS: Added collection" << endl;
 	} else {
+		/* extract the error message */
 		char *json_response = basic_extract_json_response(response);
 		json parsed_response = json::parse(json_response);
 		if (parsed_response.contains("error")) {
@@ -952,41 +1149,63 @@ void add_collection(string &cookies, string &token) {
 
 	close_connection(sockfd);
 	free(request);
+	free(response);
+	free(send_cookies);
 }
 
+/* function that deletes a collection by sending a DELETE request */
 void delete_collection(string &cookies, string &token) {
 	string id;
 	cout<< "id=";
 	getline(cin, id);
 
+	/* checking input for spaces */
+	if (id.find(' ') != string::npos) {
+		cout << "ERROR: Incomplete/Wrong information" << endl;
+		return;
+	}
+
+	/* check if the id is a natural number */
+	if (!is_natural_number(id)) {
+		cout << "ERROR: Invalid id" << endl;
+		return;
+	}
+
+	/* concatenate the path with the id for the request */
 	char access_route[256];
 	snprintf(access_route, sizeof(access_route), "/api/v1/tema/library/collections/%s", id.c_str());
 
+	/* copy cookies to send with the request */
 	char *send_cookies = strdup(cookies.c_str());
 
+	/* send the DELETE request */
 	int sockfd = open_connection((char *)HOST, PORT, AF_INET, SOCK_STREAM, 0);
 	char *request = compute_delete_request(HOST, access_route, NULL, &send_cookies, 1, token);
 	send_to_server(sockfd, request);
 
 	char *response = receive_from_server(sockfd);
 
-	string resp_str(response);
+	/* convert to string */
+	string response_string(response);
 	
-	int status_code = get_status_code(resp_str);
+	int status_code = get_status_code(response_string);
 
+	/* check if the user has access to the library */
 	if (token.empty()) {
 		cout << "ERROR: " << status_code << " " << "JWT token required" << endl;
 		return;
 	}
 
 	if (status_code == 200) {
-		cout << "SUCCESS: Collection deleted" << endl;
-
-		string cookie = get_cookie(resp_str);
+		/* save the session cookie */
+		string cookie = get_cookie(response_string);
 		if (!cookie.empty()) {
 			cookies = cookie;
 		}
+
+		cout << "SUCCESS: Collection deleted" << endl;
 	} else {
+		/* extract the error message */
 		char *json_response = basic_extract_json_response(response);
 		json parsed_response = json::parse(json_response);
 		if (parsed_response.contains("error")) {
@@ -997,8 +1216,11 @@ void delete_collection(string &cookies, string &token) {
 
 	close_connection(sockfd);
 	free(request);
+	free(response);
+	free(send_cookies);
 }
 
+/* function that adds a movie to a collection by sending a POST request */
 void add_movie_to_collection(string &cookies, string &token) {
 	string id_collection_string, movie_id_string;
 	cout << "collection_id=";
@@ -1006,17 +1228,28 @@ void add_movie_to_collection(string &cookies, string &token) {
 	cout << "movie_id=";
 	getline(cin, movie_id_string);
 
+	/* checking input for spaces */
 	if (id_collection_string.find(' ') != string::npos ||
 	 	movie_id_string.find(' ') != string::npos) {
 		cout << "ERROR: Incomplete/Wrong information" << endl;
 		return;
 	}
 
+	/* check if the ids are natural numbers */
+	if (!is_natural_number(id_collection_string) ||
+		!is_natural_number(movie_id_string)) {
+		cout << "ERROR: Invalid id" << endl;
+		return;
+	}
+
+	/* concatenate the path with the movie id for the request */
 	char access_route[256];
-	snprintf(access_route, sizeof(access_route), "/api/v1/tema/library/collections/%s/movies", id_collection_string.c_str());
+	snprintf(access_route, sizeof(access_route), "/api/v1/tema/library/collections/%s/movies",
+		 	 id_collection_string.c_str());
 
 	int id = stoi(movie_id_string);
 
+	/* creating the JSON payload */
 	json json_data;
 	json_data["id"] = id;
 	string json_payload = json_data.dump();
@@ -1024,31 +1257,37 @@ void add_movie_to_collection(string &cookies, string &token) {
 	char *body_data[1];
 	body_data[0] = (char*)json_payload.c_str();
 
+	/* copy cookies to send with the request */
 	char *send_cookies = strdup(cookies.c_str());
 
+	/* send the POST request */
 	int sockfd = open_connection((char *)HOST, PORT, AF_INET, SOCK_STREAM, 0);
 	char *request = compute_post_request(HOST, access_route, PAYLOAD_TYPE,
 										 body_data, 1, &send_cookies, 1, token);
 	send_to_server(sockfd, request);
 	char *response = receive_from_server(sockfd);
 
-	string resp_str(response);
+	/* convert to string */
+	string response_string(response);
 	
-	int status_code = get_status_code(resp_str);
+	int status_code = get_status_code(response_string);
 
+	/* check if the user has access to the library */
 	if (token.empty()) {
 		cout << "ERROR: " << status_code << " " << "JWT token required" << endl;
 		return;
 	}
 
 	if (status_code == 201) {
-		cout << "SUCCESS: Movie added to collection" << endl;
-
-		string cookie = get_cookie(resp_str);
+		/* save the session cookie */
+		string cookie = get_cookie(response_string);
 		if (!cookie.empty()) {
 			cookies = cookie;
 		}
+
+		cout << "SUCCESS: Movie added to collection" << endl;
 	} else {
+		/* extract the error message */
 		char *json_response = basic_extract_json_response(response);
 		json parsed_response = json::parse(json_response);
 		if (parsed_response.contains("error")) {
@@ -1059,8 +1298,11 @@ void add_movie_to_collection(string &cookies, string &token) {
 
 	close_connection(sockfd);
 	free(request);
+	free(response);
+	free(send_cookies);
 }
 
+/* function that deletes a movie from a collection by sending a DELETE request */
 void delete_movie_from_collection(string &cookies, string &token) {
 	string id_collection_string, movie_id_string;
 	cout << "collection_id=";
@@ -1068,40 +1310,56 @@ void delete_movie_from_collection(string &cookies, string &token) {
 	cout << "movie_id=";
 	getline(cin, movie_id_string);
 
+	/* checking input for spaces */
 	if (id_collection_string.find(' ') != string::npos ||
 	 	movie_id_string.find(' ') != string::npos) {
 		cout << "ERROR: Incomplete/Wrong information" << endl;
 		return;
 	}
 
-	char access_route[256];
-	snprintf(access_route, sizeof(access_route), "/api/v1/tema/library/collections/%s/movies/%s", id_collection_string.c_str(), movie_id_string.c_str());
+	/* check if the ids are natural numbers */
+	if (!is_natural_number(id_collection_string) ||
+		!is_natural_number(movie_id_string)) {
+		cout << "ERROR: Invalid id" << endl;
+		return;
+	}
 
+	/* concatenate the path with the collection and the movie id for the request */
+	char access_route[256];
+	snprintf(access_route, sizeof(access_route), "/api/v1/tema/library/collections/%s/movies/%s",
+			 id_collection_string.c_str(), movie_id_string.c_str());
+
+	/* copy cookies to send with the request */
 	char *send_cookies = strdup(cookies.c_str());
 
+	/* send the DELETE request */
 	int sockfd = open_connection((char *)HOST, PORT, AF_INET, SOCK_STREAM, 0);
 	char *request = compute_delete_request(HOST, access_route, NULL, &send_cookies, 1, token);
 	send_to_server(sockfd, request);
 
 	char *response = receive_from_server(sockfd);
 
-	string resp_str(response);
+	/* convert to string */
+	string response_string(response);
 	
-	int status_code = get_status_code(resp_str);
+	int status_code = get_status_code(response_string);
 
+	/* check if the user has access to the library */
 	if (token.empty()) {
 		cout << "ERROR: " << status_code << " " << "JWT token required" << endl;
 		return;
 	}
 
 	if (status_code == 200) {
-		cout << "SUCCESS: Collection deleted" << endl;
-
-		string cookie = get_cookie(resp_str);
+		/* save the session cookie */
+		string cookie = get_cookie(response_string);
 		if (!cookie.empty()) {
 			cookies = cookie;
 		}
+
+		cout << "SUCCESS: Collection deleted" << endl;
 	} else {
+		/* extract the error message */
 		char *json_response = basic_extract_json_response(response);
 		json parsed_response = json::parse(json_response);
 		if (parsed_response.contains("error")) {
@@ -1112,29 +1370,39 @@ void delete_movie_from_collection(string &cookies, string &token) {
 
 	close_connection(sockfd);
 	free(request);
+	free(response);
+	free(send_cookies);
 }
 
+/* function that logs out a user by sending a GET request */
 void logout(string &cookies, string &token) {
 	const char *access_route = "/api/v1/tema/user/logout";
 
+	/* copy cookies to send with the request */
 	char *send_cookies = strdup(cookies.c_str());
 
+	/* send the GET request */
 	int sockfd = open_connection((char *)HOST, PORT, AF_INET, SOCK_STREAM, 0);
 	char *request = compute_get_request(HOST, access_route, NULL, &send_cookies, 1, token);
 	send_to_server(sockfd, request);
 
 	char *response = receive_from_server(sockfd);
 
-	string resp_str(response);
+	/* convert to string */
+	string response_string(response);
 	
-	int status_code = get_status_code(resp_str);
+	int status_code = get_status_code(response_string);
 
 	if (status_code == 200) {
-		cout << "SUCCESS: User logged off" << endl;
-
+		/* clear the cookies */
 		cookies.clear();
+
+		/* clear the token */
 		token.clear();
+
+		cout << "SUCCESS: User logged off" << endl;
 	} else {
+		/* extract the error message */
 		char *json_response = basic_extract_json_response(response);
 		json parsed_response = json::parse(json_response);
 		if (parsed_response.contains("error")) {
@@ -1145,4 +1413,6 @@ void logout(string &cookies, string &token) {
 
 	close_connection(sockfd);
 	free(request);
+	free(response);
+	free(send_cookies);
 }
